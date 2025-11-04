@@ -8,7 +8,7 @@
 // R32_UART2_CTRL: RX PA6, TX PA7
 // R32_UART3_CTRL: RX PA4, TX PA5
 
-#define TARGET_UART &R32_UART3_CTRL
+#define TARGET_UART &R32_UART1_CTRL
 
 int main() {
 	SystemInit();
