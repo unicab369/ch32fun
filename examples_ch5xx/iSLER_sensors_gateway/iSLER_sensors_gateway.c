@@ -4,16 +4,15 @@
 #include <stdio.h>
 #include "../iSLER_sensor_lowpower_node/ch5xx_Mess.h"
 
-#define SLEEPTIME_MS 4000
-#define LED PA8
+#define LED_PIN PA8
 
-uint8_t frame_info[] = {0xff, 0x10}; // PDU, len, (maybe not?) needed in RX mode
+uint8_t frame_info[] = { 0xff, 0x10 }; // PDU, len, (maybe not?) needed in RX mode
 
-void blink(int n) {
+void blink(int led_pin, int n) {
 	for(int i = n-1; i >= 0; i--) {
-		funDigitalWrite( LED, FUN_LOW ); // Turn on LED
+		funDigitalWrite(led_pin, 0); // Turn on LED
 		Delay_Ms(33);
-		funDigitalWrite( LED, FUN_HIGH ); // Turn off LED
+		funDigitalWrite(led_pin, 1); // Turn off LED
 		if(i) Delay_Ms(33);
 	}
 }
@@ -27,8 +26,8 @@ void handle_receiving_frame(uint32_t time) {
 	// we stepped over !rx_ready so we got a frame
 	remote_command_t* cmd = chMess_rx_handler();
 	if (cmd) {
-		blink(1);
-		printf("Receiv Command: %02X\n", cmd->command);
+		blink(LED_PIN, 1);
+		printf("\nReceiv Command: %02X, ", cmd->command);
 		printf("Value1: %u\n", cmd->value1);
 	}
 }

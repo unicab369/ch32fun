@@ -4,8 +4,7 @@
 // Hold the BOOT pin while powering up the chip and flash it before it enters user mode
 
 //! WARNING: WHEN USE SHUTDOWN_MODE_ENABLED
-//! PA15 NEEDS TO BE IN PULLED UP MODE OR YOU WONT BE ABLE TO REFLASH THE CHIP
-//! if you dont have access to the BOOT pin PB22
+//! PA15 NEEDS TO BE IN PULLED UP MODE OR YOU WONT BE ABLE TO REFLASH THE CHIP if you dont have access to the BOOT pin PB22
 //# Ground PA15 to enter programming mode (in programming mode, PA8 led will be flashing)
 //# after flashing done, unground PA15 to enter shutdown mode
 
@@ -15,7 +14,7 @@
 #include "ch5xx_sleep.h"
 #include "ch5xx_Mess.h"
 
-#define SLEEPTIME_MS 3000
+#define SLEEPTIME_MS 5000
 #define LED PA8
 
 #define SHUTDOWN_MODE_ENABLED
@@ -46,7 +45,7 @@ remote_command_t button_cmd = {
 		RFCoreInit(LL_TX_POWER_0_DBM);
 		chMess_advertise(&button_cmd);
 
-		//# Disconnect PA15 from GND to enter power_down mode. PA15 Pull up will use less power
+		//# Disconnect PA15 from GND to enter power_down mode.
 		if (funDigitalRead(PA15)) {
 			ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
 		} 
@@ -68,7 +67,9 @@ remote_command_t button_cmd = {
 		SystemInit();
 		funGpioInitAll();
 
-		printf("Size of message: %d\n", sizeof(iSLER_frame_t));
+		// printf("Size of message: %d\n", sizeof(iSLER_frame_t));
+		// WARNGING: Allow some delay time to allow reprogramming the chip uppon power up
+		Delay_Ms(4000);
 
 		// ch5xx_setClock(CLK_SOURCE_HSE_4MHz);
 
