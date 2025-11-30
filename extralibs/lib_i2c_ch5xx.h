@@ -42,8 +42,8 @@ u8 i2c_init(u16 i2c_speed_khz) {
 
 		clock_config = (SYSTEM_CLOCK_MHZ * 1000 / (i2c_speed_khz << 1)) & RB_I2C_CCR;
 		if (clock_config < 4) clock_config = 4;
-		printf("clock_config: %d\r\n", clock_config);
-		printf("RTR: %d\r\n", R16_I2C_RTR);
+		// printf("clock_config: %d\r\n", clock_config);
+		// printf("RTR: %d\r\n", R16_I2C_RTR);
 	} 
 	else {
 		R16_I2C_RTR = 1 + SYSTEM_CLOCK_MHZ * 300 / 1000;

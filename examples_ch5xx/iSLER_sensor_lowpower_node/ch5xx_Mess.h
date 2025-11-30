@@ -51,6 +51,7 @@ typedef struct PACKED {
 	uint8_t command;
 	uint32_t value1;
 	uint32_t value2;
+	uint32_t value3;
 } remote_command_t;
 
 
@@ -125,7 +126,7 @@ iSLER_frame_t frame = {
 	}
 };
 
-void chMess_advertise(remote_command_t *cmd) {
+void MESS_advertise(remote_command_t *cmd) {
 	memcpy(&(frame.dataFrame.payload), cmd, sizeof(remote_command_t));
 
 	// printf("Frame: ");

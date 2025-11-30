@@ -27,8 +27,10 @@ void handle_receiving_frame(uint32_t time) {
 	remote_command_t* cmd = chMess_rx_handler();
 	if (cmd) {
 		blink(LED_PIN, 1);
-		printf("\nReceiv Command: %02X, ", cmd->command);
-		printf("Value1: %u\n", cmd->value1);
+		printf("\n\nReceiv Command: %02X", cmd->command);
+		printf("\nValue1: %u", cmd->value1);
+		printf("\nValue2: %u", cmd->value2);
+		printf("\nValue3: %u", cmd->value3);
 	}
 }
 
