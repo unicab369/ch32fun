@@ -111,7 +111,8 @@ void i2c_scan(void (*onPingFound)(u8 address)) {
 	// mininum 0x08 to 0x77 (0b1110111)
 	for (int i = 0x08; i < 0x77; i++) {
 		u8 ping = i2c_ping(i);
-		if (ping == 0) onPingFound(i);
+		if (ping == 0) { onPingFound(i); }
+		// else (printf("i2C addr: 0x%02X, err: 0x%02X\n", i, ping));
 	}
 }
 
@@ -119,7 +120,7 @@ void i2c_scan(void (*onPingFound)(u8 address)) {
 //! WRITE DATA FUNCTION
 //! ####################################
 
-u8 i2c_writeData(u8 address, u8 *data, u8 len) {
+u8 i2c_writeData_noStop(u8 address, u8 *data, u8 len) {
 	//# STEP 1: Send Start
 	u8 ret = i2c_start(address, 0);
 	if (ret != 0) return ret;
@@ -145,10 +146,18 @@ u8 i2c_writeData(u8 address, u8 *data, u8 len) {
 
 	//# STEP 3: Clear BTF - Read STAR1
 	volatile u16 status = R16_I2C_STAR1;
+}
+
+u8 i2c_writeData(u8 address, u8 *data, u8 len) {
+	u8 ret = i2c_writeData_noStop(address, data, len);
 
 	//# STOP I2C
 	R16_I2C_CTRL1 |= RB_I2C_STOP;
 	return i2c_get_error();
+}
+
+u8 i2c_writeByte(u8 address, u8 data) { 
+	return i2c_writeData(address, &data, 1);
 }
 
 
@@ -164,21 +173,13 @@ u8 i2c_readData(u8 address, u8 *data, u8 len) {
 		return check;
 	}
 
-	// Configure ACK for multi-byte read
-	if(len > 1) {
-		// Enable ACK for all bytes except last
-		R16_I2C_CTRL1 |= RB_I2C_ACK;
-	} else {
-		// Single byte - disable ACK (send NACK after first byte)
-		R16_I2C_CTRL1 &= ~RB_I2C_ACK;
-	}
+	//# Enable ACK at the beginning
+	R16_I2C_CTRL1 |= RB_I2C_ACK;
 
 	// Read data bytes
 	for(u8 i = 0; i < len; i++) {
-		if(i == len - 1) {
-			// Last byte - disable ACK to send NACK
-			R16_I2C_CTRL1 &= ~RB_I2C_ACK;
-		}
+		//# Last byte - disable ACK to send NACK
+		if(i == len-1) R16_I2C_CTRL1 &= ~RB_I2C_ACK;
 
 		//# STEP 2: Wait for RxNE (Receive Data Register Not Empty)
 		u32 timeout = I2C_DEFAULT_TIMEOUT;
@@ -201,4 +202,14 @@ u8 i2c_readData(u8 address, u8 *data, u8 len) {
 	//# STEP 4: STOP I2C
 	R16_I2C_CTRL1 |= RB_I2C_STOP;
 	return i2c_get_error();
+}
+
+u8 i2c_readRegTx_buffer(u8 address, u8 *tx_buf, u8 tx_len, u8 *rx_buf, u8 rx_len) {
+	u8 err = i2c_writeData_noStop(address, tx_buf, tx_len);	// Send register address
+	if (err) return err;
+	return i2c_readData(address, rx_buf, rx_len);
+}
+
+u8 i2c_readReg_buffer(u8 address, u8 reg, u8 *rx_buf, u8 rx_len) {
+	return i2c_readRegTx_buffer(address, &reg, 1, rx_buf, rx_len);
 }
