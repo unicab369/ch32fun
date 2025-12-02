@@ -1,6 +1,6 @@
 // MIT License (MIT)
 // Copyright (c) 2025 UniTheCat
-// i2c_error() method borrowed from https://github.com/ADBeta/CH32V003_lib_i2c
+// inspired by the work of ADBeta https://github.com/ADBeta/CH32V003_lib_i2c
 
 #include "ch32fun.h"
 #include <stdio.h>
@@ -100,11 +100,11 @@ u8 i2c_start(u8 address, u8 isRead) {
 }
 
 u8 i2c_ping(u8 address) {
-	u8 ret = i2c_start(address, 0);
+	u8 err = i2c_start(address, 0);
 
 	//# STOP I2C
 	R16_I2C_CTRL1 |= RB_I2C_STOP;
-	return ret;
+	return err;
 }
 
 void i2c_scan(void (*onPingFound)(u8 address)) {
@@ -120,12 +120,9 @@ void i2c_scan(void (*onPingFound)(u8 address)) {
 //! WRITE DATA FUNCTION
 //! ####################################
 
-u8 i2c_writeData_noStop(u8 address, u8 *data, u8 len) {
-	//# STEP 1: Send Start
-	u8 ret = i2c_start(address, 0);
-	if (ret != 0) return ret;
-
+u8 _i2c_Send(u8 address, u8 *data, u8 len) {
 	for (u8 i = 0; i < len; i++) {
+		//# Wait for TxE to be freed
 		u32 timeout = I2C_DEFAULT_TIMEOUT;
 		while(!(R16_I2C_STAR1 & RB_I2C_TxE) && --timeout);
 		if (timeout == 0) {
@@ -134,7 +131,7 @@ u8 i2c_writeData_noStop(u8 address, u8 *data, u8 len) {
 		}
 		R16_I2C_DATAR = data[i];
 
-		//# STEP 2: Wait for BTF (Byte Transfer Finished) - all data shifted out
+		//# Wait for BTF (Byte Transfer Finished) - all data shifted out
 		timeout = I2C_DEFAULT_TIMEOUT;
 		while(!(R16_I2C_STAR1 & RB_I2C_BTF) && --timeout);
 		// skip error checking to handle clock stretching devices
@@ -144,34 +141,31 @@ u8 i2c_writeData_noStop(u8 address, u8 *data, u8 len) {
 		}
 	}
 
-	//# STEP 3: Clear BTF - Read STAR1
+	//# Clear BTF - Read STAR1
 	volatile u16 status = R16_I2C_STAR1;
+	return 0;
 }
 
 u8 i2c_writeData(u8 address, u8 *data, u8 len) {
-	u8 ret = i2c_writeData_noStop(address, data, len);
+	//# Send Start
+	u8 err = i2c_start(address, 0);
+	if (err != 0) return err;
+
+	//# Send Data
+	err = _i2c_Send(address, data, len);
 
 	//# STOP I2C
 	R16_I2C_CTRL1 |= RB_I2C_STOP;
 	return i2c_get_error();
 }
 
-u8 i2c_writeByte(u8 address, u8 data) { 
-	return i2c_writeData(address, &data, 1);
-}
-
-
 //! ####################################
 //! READ DATA FUNCTION
 //! ####################################
 
 u8 i2c_readData(u8 address, u8 *data, u8 len) {
-	//# STEP 1: Send Start
-	u8 check = i2c_start(address, 1);
-	if (check != 0) {
-		R16_I2C_CTRL1 |= RB_I2C_STOP;
-		return check;
-	}
+	u8 err = i2c_start(address, 1);
+	if (err != 0) return err;
 
 	//# Enable ACK at the beginning
 	R16_I2C_CTRL1 |= RB_I2C_ACK;
@@ -181,7 +175,7 @@ u8 i2c_readData(u8 address, u8 *data, u8 len) {
 		//# Last byte - disable ACK to send NACK
 		if(i == len-1) R16_I2C_CTRL1 &= ~RB_I2C_ACK;
 
-		//# STEP 2: Wait for RxNE (Receive Data Register Not Empty)
+		//# Wait for RxNE (Receive Data Register Not Empty)
 		u32 timeout = I2C_DEFAULT_TIMEOUT;
 		while(!(R16_I2C_STAR1 & RB_I2C_RxNE) && --timeout);
 		if (timeout == 0) {
@@ -192,21 +186,31 @@ u8 i2c_readData(u8 address, u8 *data, u8 len) {
 		// Read data byte
 		data[i] = R16_I2C_DATAR;
 
-		//# STEP 3: Check for BTF and clear if needed
+		//# Check for BTF and clear if needed
 		if (R16_I2C_STAR1 & RB_I2C_BTF) {
 			volatile uint16_t status = R16_I2C_STAR1;
 			data[i] = R16_I2C_DATAR; // Read again to clear BTF
 		}
 	}
 
-	//# STEP 4: STOP I2C
+	//# STOP I2C
 	R16_I2C_CTRL1 |= RB_I2C_STOP;
 	return i2c_get_error();
 }
 
 u8 i2c_readRegTx_buffer(u8 address, u8 *tx_buf, u8 tx_len, u8 *rx_buf, u8 rx_len) {
-	u8 err = i2c_writeData_noStop(address, tx_buf, tx_len);	// Send register address
-	if (err) return err;
+	//# Send Start
+	u8 err = i2c_start(address, 0);
+	if (err != 0) return err;
+
+	//# Send Data
+	err = _i2c_Send(address, tx_buf, tx_len);	// Send register address
+	if (err) {
+		printf("error %d\n", err);
+		return err;
+	}
+
+	//# Read Data
 	return i2c_readData(address, rx_buf, rx_len);
 }
 
