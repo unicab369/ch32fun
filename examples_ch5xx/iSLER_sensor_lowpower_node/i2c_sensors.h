@@ -4,25 +4,18 @@
 #define DEBUG_ENABLED
 #define R_SHUNT_mOHM 100
 
-remote_command_t sensor_cmd = {
-	.command = 0xBB,
-	.value1 = 0,
-	.value2 = 0,
-	.value3 = 0
-};
-
-u16 bh1750_read(u8 address) {
+void bh1750_read(u8 address, u16 *lux) {
 	//# request reading
 	u8 ret = i2c_writeData(address, (u8[]){0x13}, 1);
-	if (ret != 0) { return 0; }
+	if (ret != 0) return;
 
 	//# parse reading
 	u8 data[2];
 	ret = i2c_readData(address, data, 2);
-	if (ret != 0) { return 0; }
+	if (ret != 0) return;
 
 	u16 lux_raw = BUF_MAKE_U16(data);
-	return lux_raw * 12 / 10;
+	*lux = lux_raw * 12 / 10;
 }
 
 void sht3x_read(u8 address, u16 *temp, u16 *hum) {
@@ -37,47 +30,51 @@ void sht3x_read(u8 address, u16 *temp, u16 *hum) {
 	*hum = (100 * hum_raw) >> 16;		// >> 16 is equivalent to / 65536
 }
 
-#define MAX_CURRENT_MA 300
-
 u32 max_shunt_mV = 0;
 
 void ina219_read(
 	u8 address,
-	u16 *bus_mV, int16_t *shunt_uV,
-	u16 *power_uW, int16_t *current_uA
+	u16 *bus_mV, u16 *shunt_mV,
+	u16 *current_mA, u16 *power_mW
 ) {
 	u8 ret;
 	u8 buff[2];
 
 	//# Read shunt voltage in uV
 	ret = i2c_readReg_buffer(address, 0x01, buff, 2);
-	if (ret != 0) { printf("\nERROR: INA219 shunt 0x%02X\r\n", ret); return; }	
-	int16_t raw_shunt = (int16_t)((buff[0] << 8) | buff[1]);
-	*shunt_uV = raw_shunt * 10;
+	if (ret != 0) return;
+
+	u16 raw_shunt = (buff[0] << 8) | buff[1];
+	*shunt_mV = raw_shunt/100;
 
 	//# Read bus voltage in mV
 	ret = i2c_readReg_buffer(address, 0x02, buff, 2);
-	if (ret != 0) { printf("\nERROR: INA219 bus 0x%02X\r\n", ret); return; }
+	if (ret != 0) return;
+
 	u16 raw_bus = (buff[0] << 8) | buff[1];
 	*bus_mV = (raw_bus >> 3) * 4;
 
 	// Max_Shunt_Current = Max_shunt_V / R_shunt;
 	// Current_LSB = Max_Shunt_Current / 2^15 = Max_shunt_V / (R_shunt * 32768)
-	int32_t uCurrent_LSB = 1000000 * max_shunt_mV / (R_SHUNT_mOHM * 32768);
+	u32 uCurrent_LSB = 1000000 * max_shunt_mV / (R_SHUNT_mOHM * 32768);
 
 	//# Read power in uW
 	ret = i2c_readReg_buffer(address, 0x03, buff, 2);
-	if (ret != 0) { printf("\nERROR: INA219 power 0x%02X\r\n", ret); return; }	
-	u16 raw_power = (buff[0] << 8) | buff[1];
+	if (ret != 0) return;
+
+	u32 raw_power = (buff[0] << 8) | buff[1];
 	// power = raw_value * 20 * Current_LSB
-	*power_uW = raw_power * 20 * uCurrent_LSB;
+	u32 _power_mW = raw_power * 20 * uCurrent_LSB;
+	*power_mW = (_power_mW + 500) / 1000; // convert to mW - rounded up
 
 	//# Read current in mA
 	ret = i2c_readReg_buffer(address, 0x04, buff, 2);
-	if (ret != 0) { printf("\nERROR: INA219 current 0x%02X\r\n", ret); return; }
-	int16_t raw_current = (int16_t)((buff[0] << 8) | buff[1]);
+	if (ret != 0) return;
+
+	u16 raw_current = (buff[0] << 8) | buff[1];
 	// current = raw_value * current_LSB
-	*current_uA = raw_current * uCurrent_LSB;
+	*current_mA = raw_current * uCurrent_LSB;
+	*current_mA = (*current_mA + 500) / 1000; // convert to mA - rounded up
 }
 
 
@@ -118,14 +115,19 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 					SHUNT_RESOLUTION_AVERAGE |
 					DEVICE_MODE;
     uint8_t config_bytes[3] = { 0x00, config >> 8, config & 0xFF };
-	printf("\nconfig: 0x%02X 0x%02X\n", config_bytes[1], config_bytes[2]);
+
+	#ifdef DEBUG_ENABLED
+		// expect 0x19 0x9F
+		printf("\nconfig: 0x%02X 0x%02X\n", config_bytes[1], config_bytes[2]);
+	#endif
 
     u8 ret;
     ret = i2c_writeData(address, config_bytes, 3);
 	if (ret != 0) {
 		#ifdef DEBUG_ENABLED
-			printf("\nERROR: INA219 config 0x%02X\r\n", ret); return;
+			printf("\nERROR: INA219 config 0x%02X\r\n", ret);
 		#endif
+		return;
 	}
 
 	// u8 data[2];
@@ -156,7 +158,6 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 
 	// Therefore:
 	// calib = .04096 / ((Max_Shunt_Current/32768) * R_shunt)
-	// calib = .04096 * 32768 / (Max_Shunt_Current * R_shunt)
 	// calib = .04096 * 32768 / (Max_shunt_V)
 	// calib = .04096 * 32768 * 10^6 / (max_shunt_mV * 1000)
 	// calib = 1342,177,280 / (max_shunt_mV * 1000)
@@ -164,7 +165,11 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 	u32 calibration_value = 1342177280 / (max_shunt_mV * 1000);
 	uint8_t cal_bytes[3] = { 0x05, calibration_value >> 8, calibration_value & 0xFF };
 	ret = i2c_writeData(address, cal_bytes, 3);
-	printf("cal: 0x%02X 0x%02X\n", cal_bytes[1], cal_bytes[2]);
+
+	#ifdef DEBUG_ENABLED
+		// expect 0x10 0x62
+		printf("cal: 0x%02X 0x%02X\n", cal_bytes[1], cal_bytes[2]);
+	#endif
 
 	if (ret != 0) {
 		#ifdef DEBUG_ENABLED
@@ -177,9 +182,8 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 	// printf("read calib: 0x%02X 0x%02X\n", data[0], data[1]);
 }
 
-void collect_readings() {
+void prepare_sensors() {
 	//# setup BH1750
-	u16 temp, hum, lux;
 	u8 ret;
 	u8 i2c_address = 0x23;
 
@@ -189,16 +193,14 @@ void collect_readings() {
 		#ifdef DEBUG_ENABLED 
 			printf("\nERROR: BH1750 powerON 0x%02X\r\n", ret);
 		#endif
-		return;
-	}
-
-	// set resolution
-	ret = i2c_writeData(i2c_address, (u8[]){0x23}, 1);
-	if (ret != 0) {
-		#ifdef DEBUG_ENABLED
-			printf("\nERROR: BH1750 resolution 0x%02X\r\n", ret);
-		#endif
-		return;
+	} else {
+		// set resolution
+		ret = i2c_writeData(i2c_address, (u8[]){0x23}, 1);
+		if (ret != 0) {
+			#ifdef DEBUG_ENABLED
+				printf("\nERROR: BH1750 resolution 0x%02X\r\n", ret);
+			#endif
+		}
 	}
 
 	//# setup SHT3x
@@ -215,31 +217,9 @@ void collect_readings() {
 		#ifdef DEBUG_ENABLED
 			printf("\nERROR: SHT3x config 0x%02X\r\n", ret);
 		#endif
-		return;
 	}
-
-	Delay_Us(100);	//! DELAY is REQUIRED on power up
-	sht3x_read(0x44, &temp, &hum);
-	sensor_cmd.value1 = temp;
-	sensor_cmd.value2 = hum;
-
-	//# get BH1750 reading
-	lux = bh1750_read(0x23);
-	sensor_cmd.value3 = lux;
-	printf("temp: %d, hum: %d, lux: %d\n", temp, hum, lux);
-
 
 	//# setup INA219
 	i2c_address = 0x40;
-
 	i2c_ina219_setup(i2c_address, 0, 3);
-	int16_t shunt_uV, current_uA;
-	u16 bus_mV, power_uW;
-
-	while(1) {
-		ina219_read(i2c_address, &shunt_uV, &bus_mV, &current_uA, &power_uW);
-		printf("shunt_uV: %d, bus_mV: %d, current_uA: %d, power_uW: %d\n",
-				shunt_uV, bus_mV, current_uA, power_uW);
-		Delay_Ms(1000);
-	}
 }

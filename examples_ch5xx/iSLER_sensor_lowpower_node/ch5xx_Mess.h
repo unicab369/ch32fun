@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #define PRINT_STRUCT_BYTES(struct_ptr, format) do { \
-	const uint8_t* bytes = (const uint8_t*)(struct_ptr); \
+	const u8* bytes = (const u8*)(struct_ptr); \
 	for (size_t i = 0; i < sizeof(*(struct_ptr)); i++) { \
 		printf(format " ", bytes[i]); \
 	} \
@@ -26,41 +26,43 @@
 #endif
 
 typedef struct PACKED {
-	uint16_t preamble;		  // Sync pattern (0xAABB)
-	uint16_t control_bits;	  // control bits
-	uint16_t msgCode;		   // message integrity check
-	uint8_t dest[6];			// destination
+	u16 preamble;		  // Sync pattern (0xAABB)
+	u16 control_bits;	  // control bits
+	u16 msgCode;		   // message integrity check
+	u8 dest[6];			// destination
 
-	uint8_t group_id;
-	uint8_t data_len;		  			 // length
-	uint8_t payload[MAX_PAYLOAD_LEN];	// max payload length
+	u8 group_id;
+	u8 data_len;		  			 // length
+	u8 payload[MAX_PAYLOAD_LEN];	// max payload length
 } MESS_DataFrame_t;
 
 typedef struct PACKED {
-	uint8_t mac[6];
-	uint8_t field_adv_flags[3];
-	uint8_t name_len;
-	uint8_t ad_type_local_name;
-	uint8_t name[20];
-	uint8_t data_len;
-	uint8_t field_sev_data[3];
+	u8 mac[6];
+	u8 field_adv_flags[3];
+	u8 name_len;
+	u8 ad_type_local_name;
+	u8 name[20];
+	u8 data_len;
+	u8 field_sev_data[3];
 	MESS_DataFrame_t dataFrame;
 } iSLER_frame_t;
 
 typedef struct PACKED {
-	uint8_t command;
-	uint32_t value1;
-	uint32_t value2;
-	uint32_t value3;
+	u8 command;
+	u16 value1;
+	u16 value2;
+	u16 value3;
+	u16 value4;
+	u16 value5;
 } remote_command_t;
 
 
 // BLE advertisements are sent on channels 37, 38 and 39
-uint8_t adv_channels[] = {37, 38, 39};
-// uint8_t adv_channels[] = {37};
+u8 adv_channels[] = {37, 38, 39};
+// u8 adv_channels[] = {37};
 
-void Frame_TX2(uint8_t adv[], size_t len, uint8_t channel, uint8_t phy_mode) {
-	__attribute__((aligned(4))) uint8_t  ADV_BUF[len+2]; // for the advertisement, which is 37 bytes + 2 header bytes
+void Frame_TX2(u8 adv[], size_t len, u8 channel, u8 phy_mode) {
+	__attribute__((aligned(4))) u8  ADV_BUF[len+2]; // for the advertisement, which is 37 bytes + 2 header bytes
 
 	BB->CTRL_TX = (BB->CTRL_TX & 0xfffffffc) | 1;
 
@@ -134,15 +136,15 @@ void MESS_advertise(remote_command_t *cmd) {
 	// printf("\n");
 
 	for(int c = 0; c < sizeof(adv_channels); c++) {
-		Frame_TX((uint8_t*)&frame, sizeof(frame), adv_channels[c], PHY_MODE);
+		Frame_TX((u8*)&frame, sizeof(frame), adv_channels[c], PHY_MODE);
 	}
 }
 
 remote_command_t* chMess_rx_handler() {
 	// The chip stores the incoming frame in LLE_BUF, defined in extralibs/iSLER.h
-	uint8_t *frame = (uint8_t*)LLE_BUF;
+	u8 *frame = (u8*)LLE_BUF;
 	iSLER_frame_t* rx_frame = (iSLER_frame_t*)(frame + 2);
-	uint8_t target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+	u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
 
 	if (memcmp(rx_frame->mac, target_mac, 6) == 0) {
 		// first 8 bytes contains: [RSSI x 1Byte] [len x 1Byte] [MAC x 6Bytes]
