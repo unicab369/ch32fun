@@ -1,8 +1,47 @@
 #include "lib_i2c_ch5xx.h"
+#include "lib_ssd1306.h"
 #include "register_debug_utilities.h"
 
-#define DEBUG_ENABLED
+#define I2C_DEBUG_ENABLED
 #define R_SHUNT_mOHM 100
+
+#define BH1750_ADDR 0x23
+#define SHT3X_ADDR 0x44
+#define INA219_ADDR 0x40
+#define SSD1306_ADDR 0x3C
+
+//# SSD1306 INTERFACES
+/* send OLED command byte */
+u8 SSD1306_CMD(u8 cmd) {
+	u8 pkt[2];
+	pkt[0] = 0;
+	pkt[1] = cmd;
+	return i2c_writeData(SSD1306_ADDR, pkt, 2);
+}
+
+/* send OLED data packet (up to 32 bytes) */
+u8 SSD1306_DATA(u8 *data, int sz) {
+	u8 pkt[33];
+	pkt[0] = 0x40;
+	memcpy(&pkt[1], data, sz);
+	return i2c_writeData(SSD1306_ADDR, pkt, sz+1);
+}
+
+
+#define I2C_MENU_LINE_SPACING 12
+
+Str_Config_t MENU_STR_CONFIG = {
+	.FONT = FONT_7x5,
+	.WIDTH = 5,
+	.HEIGHT = 7,
+	.SPACE = 1,
+	.scale_mode = 3,
+	.color = 1,
+};
+
+void menu_render_text_at(u8 line, const char *str) {
+	ssd1306_render_scaled_txt(0, line * I2C_MENU_LINE_SPACING, str, &MENU_STR_CONFIG);
+}
 
 void bh1750_read(u8 address, u16 *lux) {
 	//# request reading
@@ -116,25 +155,21 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 					DEVICE_MODE;
     uint8_t config_bytes[3] = { 0x00, config >> 8, config & 0xFF };
 
-	#ifdef DEBUG_ENABLED
-		// expect 0x19 0x9F
-		printf("\nconfig: 0x%02X 0x%02X\n", config_bytes[1], config_bytes[2]);
-	#endif
-
     u8 ret;
     ret = i2c_writeData(address, config_bytes, 3);
 	if (ret != 0) {
-		#ifdef DEBUG_ENABLED
+		#ifdef I2C_DEBUG_ENABLED
 			printf("\nERROR: INA219 config 0x%02X\r\n", ret);
 		#endif
 		return;
 	}
 
-	// u8 data[2];
-	// ret = i2c_readData(address, data, 2);
-	// // expect 0x19 0x9F
-	// printf("read config: 0x%02X 0x%02X\n", data[0], data[1]);
+	u8 data[2];
 
+	#ifdef I2C_DEBUG_ENABLED
+		ret = i2c_readData(address, data, 2);
+		printf("\nINA219 config: 0x%02X 0x%02X\n", data[0], data[1]);	// expect 0x19 0x9F
+	#endif
 	
     switch (pg_gain) {
         case 0:	// 40mV
@@ -166,60 +201,52 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 	uint8_t cal_bytes[3] = { 0x05, calibration_value >> 8, calibration_value & 0xFF };
 	ret = i2c_writeData(address, cal_bytes, 3);
 
-	#ifdef DEBUG_ENABLED
-		// expect 0x10 0x62
-		printf("cal: 0x%02X 0x%02X\n", cal_bytes[1], cal_bytes[2]);
-	#endif
-
 	if (ret != 0) {
-		#ifdef DEBUG_ENABLED
+		#ifdef I2C_DEBUG_ENABLED
 			printf("\nERROR: INA219 calibration 0x%02X\r\n", ret);
 		#endif
 	}
 
-	// ret = i2c_readReg_buffer(address, 0x05, data, 2);
-	// // expect 0x10 0x62
-	// printf("read calib: 0x%02X 0x%02X\n", data[0], data[1]);
+	#ifdef I2C_DEBUG_ENABLED
+		ret = i2c_readReg_buffer(address, 0x05, data, 2);
+		printf("INA219 calib: 0x%02X 0x%02X\n", data[0], data[1]);	// expect 0x10 0x62
+	#endif
 }
 
 void prepare_sensors() {
 	//# setup BH1750
 	u8 ret;
-	u8 i2c_address = 0x23;
 
 	// power on
-	ret = i2c_writeData(i2c_address, (u8[]){0x01}, 1);
+	ret = i2c_writeData(BH1750_ADDR, (u8[]){0x01}, 1);
 	if (ret != 0) {
-		#ifdef DEBUG_ENABLED 
+		#ifdef I2C_DEBUG_ENABLED 
 			printf("\nERROR: BH1750 powerON 0x%02X\r\n", ret);
 		#endif
 	} else {
 		// set resolution
-		ret = i2c_writeData(i2c_address, (u8[]){0x23}, 1);
+		ret = i2c_writeData(BH1750_ADDR, (u8[]){0x23}, 1);
 		if (ret != 0) {
-			#ifdef DEBUG_ENABLED
+			#ifdef I2C_DEBUG_ENABLED
 				printf("\nERROR: BH1750 resolution 0x%02X\r\n", ret);
 			#endif
 		}
 	}
 
 	//# setup SHT3x
-	i2c_address = 0x44;
-
 	// soft reset
-	ret = i2c_writeData(i2c_address, (u8[]){0x30, 0xA2}, 2);
+	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
 	// this command will alwasy be busy, don't check for error
 	// Delay_Ms(1);	//! DELAY is REQUIRED on power up
 
 	// config
-	ret = i2c_writeData(i2c_address, (u8[]){0x21, 0x30}, 2);
+	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x21, 0x30}, 2);
 	if (ret != 0) {
-		#ifdef DEBUG_ENABLED
+		#ifdef I2C_DEBUG_ENABLED
 			printf("\nERROR: SHT3x config 0x%02X\r\n", ret);
 		#endif
 	}
 
 	//# setup INA219
-	i2c_address = 0x40;
-	i2c_ina219_setup(i2c_address, 0, 3);
+	i2c_ina219_setup(INA219_ADDR, 0, 3);
 }
