@@ -19,7 +19,7 @@
 #define BLE_AD_FLAGS(flags) 0x02, 0x01, flags
 
 #define PHY_MODE				PHY_1M
-#define MAX_PAYLOAD_LEN		 16
+#define MAX_PAYLOAD_LEN		 20
 
 #ifndef PACKED
 #define PACKED __attribute__( ( packed ) )
@@ -54,6 +54,9 @@ typedef struct PACKED {
 	u16 value3;
 	u16 value4;
 	u16 value5;
+	u16 value6;
+	u16 value7;
+	u16 value8;
 } remote_command_t;
 
 

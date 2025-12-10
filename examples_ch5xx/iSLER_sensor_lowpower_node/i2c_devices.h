@@ -2,7 +2,7 @@
 #include "lib_ssd1306.h"
 #include "register_debug_utilities.h"
 
-#define I2C_DEBUG_ENABLED
+// #define I2C_DEBUG_ENABLED
 #define R_SHUNT_mOHM 100
 
 #define BH1750_ADDR 0x23
@@ -159,7 +159,7 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
     ret = i2c_writeData(address, config_bytes, 3);
 	if (ret != 0) {
 		#ifdef I2C_DEBUG_ENABLED
-			printf("\nERROR: INA219 config 0x%02X\r\n", ret);
+			printf("\nERROR: INA219 config 0x%02X\n", ret);
 		#endif
 		return;
 	}
@@ -214,9 +214,17 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 }
 
 void prepare_sensors() {
-	//# setup BH1750
 	u8 ret;
 
+	//# setup INA219
+	i2c_ina219_setup(INA219_ADDR, 0, 3);
+
+	// //# setup SHT3x
+	// // soft reset - this command will alwasy be busy, don't check for error
+	// ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
+	// Delay_Ms(1);
+
+	//# setup BH1750
 	// power on
 	ret = i2c_writeData(BH1750_ADDR, (u8[]){0x01}, 1);
 	if (ret != 0) {
@@ -233,20 +241,11 @@ void prepare_sensors() {
 		}
 	}
 
-	//# setup SHT3x
-	// soft reset
-	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
-	// this command will alwasy be busy, don't check for error
-	// Delay_Ms(1);	//! DELAY is REQUIRED on power up
-
-	// config
+	//# SHT3x config
 	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x21, 0x30}, 2);
 	if (ret != 0) {
 		#ifdef I2C_DEBUG_ENABLED
 			printf("\nERROR: SHT3x config 0x%02X\r\n", ret);
 		#endif
 	}
-
-	//# setup INA219
-	i2c_ina219_setup(INA219_ADDR, 0, 3);
 }
