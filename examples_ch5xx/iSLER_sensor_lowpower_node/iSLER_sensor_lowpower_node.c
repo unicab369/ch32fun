@@ -18,7 +18,7 @@
 #include "../adc_basic/fun_adc_ch5xx.h"
 
 #define SHUTDOWN_MODE_ENABLED
-// #define TEST_MODE_ENABLED
+#define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 10000
@@ -143,8 +143,11 @@ void collect_readings() {
 			ssd1306_init();
 
 			while(1) {
-				collect_readings();
-				Delay_Ms(1000);
+				// collect_readings();
+				// Delay_Ms(1000);
+
+				funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
+				funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
 			}
 		#else
 			collect_readings();
@@ -178,9 +181,9 @@ void collect_readings() {
 		LSIEnable(); // Disable LSE, enable LSI
 		ch5xx_sleep_rtc_init();
 
-		// //# advertise
-		// RFCoreInit(LL_TX_POWER_0_DBM);
-		// MESS_advertise(&sensor_cmd);
+		//# advertise
+		RFCoreInit(LL_TX_POWER_0_DBM);
+		MESS_advertise(&sensor_cmd);
 
 		//# sleep
 		ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
