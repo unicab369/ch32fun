@@ -136,7 +136,7 @@ void collect_readings() {
 
 		//# get sensors readings
 		prepare_sensors();
-		Delay_Ms(2); // wait for sensors to stabilize
+		// Delay_Us(100);		// wait for sensors to stabilize
 
 		#ifdef TEST_MODE_ENABLED
 			printf("\nInternal Voltage: %d mV\r\n", vInternal_mV);
@@ -150,15 +150,15 @@ void collect_readings() {
 			collect_readings();
 		#endif
 
-		// if (bus_mV > SOLAR_SWITCH_THRESHOLD_mV && vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV) {
-		// 	// switch to solar power
-		// 	funDigitalWrite(POWER_CTRL_PIN, 1);
-		// 	// printf("*** Switched to Solar power source\r\n");
-		// } else {
-		// 	// switch to battery power
-		// 	funDigitalWrite(POWER_CTRL_PIN, 0);
-		// 	// printf("Battery power source\r\n");
-		// }
+		if (bus_mV > SOLAR_SWITCH_THRESHOLD_mV && vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV) {
+			// switch to solar power
+			funDigitalWrite(POWER_CTRL_PIN, 1);
+			// printf("*** Switched to Solar power source\r\n");
+		} else {
+			// switch to battery power
+			funDigitalWrite(POWER_CTRL_PIN, 0);
+			// printf("Battery power source\r\n");
+		}
 
 		//# Turn off sensor power
 		funDigitalWrite(SENSOR_POWER_PIN, 1);
@@ -178,9 +178,9 @@ void collect_readings() {
 		LSIEnable(); // Disable LSE, enable LSI
 		ch5xx_sleep_rtc_init();
 
-		// //# advertise
-		// RFCoreInit(LL_TX_POWER_0_DBM);
-		// MESS_advertise(&sensor_cmd);
+		//# advertise
+		RFCoreInit(LL_TX_POWER_0_DBM);
+		MESS_advertise(&sensor_cmd);
 
 		//# sleep
 		ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
