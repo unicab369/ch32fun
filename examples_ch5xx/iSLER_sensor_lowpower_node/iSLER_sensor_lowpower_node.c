@@ -22,13 +22,13 @@
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 10000
-#define SOLAR_SWITCH_THRESHOLD_mV 2600
+#define SOLAR_SWITCH_THRESHOLD_mV 2700
 
 #define LED_PIN PA8
 
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
 #define SENSOR_POWER_PIN 		PA4			// HIGH = Turn on power to sensors
-#define POWER_CTRL_PIN 			PA5			// HIGH = switch to Solar power source
+#define POWER_CTRL_PIN 			PB22		// HIGH = switch to Solar power source
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -103,9 +103,9 @@ void collect_readings() {
 		funPinMode(SENSOR_POWER_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
 		funDigitalWrite(SENSOR_POWER_PIN, 0);
 
-		//# Power Control Pin LOW = default to battery power
+		// //# Power Control Pin LOW = default to battery power
 		funPinMode(POWER_CTRL_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(POWER_CTRL_PIN, 0);
+		// funDigitalWrite(POWER_CTRL_PIN, 0);
 
 		//# Turn on the LED_PIN - for WeAct board PA8 is active LOW
 		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
