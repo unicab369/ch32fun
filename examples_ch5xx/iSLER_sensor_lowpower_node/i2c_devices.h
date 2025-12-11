@@ -111,6 +111,8 @@ void ina219_read(
 	if (ret != 0) return;
 
 	u16 raw_current = (buff[0] << 8) | buff[1];
+	// printf("\nRaw current: %d\r\n", raw_current);
+	// printf("uCurrent_LSB: %d uA\r\n", uCurrent_LSB);
 	// current = raw_value * current_LSB
 	*current_mA = raw_current * uCurrent_LSB;
 	*current_mA = (*current_mA + 500) / 1000; // convert to mA - rounded up
@@ -219,10 +221,10 @@ void prepare_sensors() {
 	//# setup INA219
 	i2c_ina219_setup(INA219_ADDR, 0, 3);
 
-	// //# setup SHT3x
-	// // soft reset - this command will alwasy be busy, don't check for error
-	// ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
-	// Delay_Ms(1);
+	//# setup SHT3x
+	// soft reset - this command will alwasy be busy, don't check for error
+	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
+	Delay_Ms(1);
 
 	//# setup BH1750
 	// power on
