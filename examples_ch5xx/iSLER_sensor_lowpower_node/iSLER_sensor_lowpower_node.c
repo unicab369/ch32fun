@@ -25,10 +25,10 @@
 
 #define LED_PIN PA8
 
-#define POWER_CTRL_PIN PB23			// HIGH = switch to auxiliary power source
-#define SENSOR_POWER_PIN PB22		// HIGH = Turn on power to sensors
+// #define POWER_CTRL_PIN PB23			// HIGH = switch to auxiliary power source
+#define SENSOR_POWER_PIN PA4		// HIGH = Turn on power to sensors
 #define SENSOR_MODE_PIN PA15		// LOW = Exit shutdown mode
-#define VOLTAGE_DIVIDER_CTRL PA4	// HIGH = enable voltage divider
+// #define VOLTAGE_DIVIDER_CTRL PA4	// HIGH = enable voltage divider
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -99,8 +99,8 @@ void collect_readings() {
 		funGpioInitAll();
 
 		ch5xx_allPinsPullUp();
-		funPinMode(VOLTAGE_DIVIDER_CTRL, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(VOLTAGE_DIVIDER_CTRL, 1); // enable voltage divider
+		// funPinMode(VOLTAGE_DIVIDER_CTRL, GPIO_CFGLR_OUT_2Mhz_PP);
+		// funDigitalWrite(VOLTAGE_DIVIDER_CTRL, 1); // enable voltage divider
 		
 		funPinMode(SENSOR_POWER_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
 		// funDigitalWrite(SENSOR_POWER_PIN, 0);
@@ -129,19 +129,19 @@ void collect_readings() {
 		adc_buf_enable(1);
 		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 
-		while(1) {
-			int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-			sensor_cmd.value7 = solar_mV;
-			printf("Solar: %d mV\r\n", solar_mV);
-			Delay_Ms(1000);
-		}
+		// while(1) {
+		// 	int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+		// 	sensor_cmd.value7 = solar_mV;
+		// 	printf("Solar: %d mV\r\n", solar_mV);
+		// 	Delay_Ms(1000);
+		// }
 
 		//# switch to supercap power if internal voltage is sufficient
-		int vInternal_OK = vInternal_mV > 2500;
-		funPinMode(POWER_CTRL_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(POWER_CTRL_PIN, vInternal_OK);
-		sensor_cmd.value8 = vInternal_OK;
-		Delay_Ms(1);
+		// int vInternal_OK = vInternal_mV > 2500;
+		// funPinMode(POWER_CTRL_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
+		// funDigitalWrite(POWER_CTRL_PIN, vInternal_OK);
+		// sensor_cmd.value8 = vInternal_OK;
+		// Delay_Ms(1);
 
 		// int ldo_OK = solar_mV > 2500;
 		// //# switch back to battery if LDO voltage is low
