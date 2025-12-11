@@ -28,7 +28,6 @@
 // #define POWER_CTRL_PIN PB23			// HIGH = switch to auxiliary power source
 #define SENSOR_POWER_PIN PA4		// HIGH = Turn on power to sensors
 #define SENSOR_MODE_PIN PA15		// LOW = Exit shutdown mode
-// #define VOLTAGE_DIVIDER_CTRL PA4	// HIGH = enable voltage divider
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -99,9 +98,6 @@ void collect_readings() {
 		funGpioInitAll();
 
 		ch5xx_allPinsPullUp();
-		// funPinMode(VOLTAGE_DIVIDER_CTRL, GPIO_CFGLR_OUT_2Mhz_PP);
-		// funDigitalWrite(VOLTAGE_DIVIDER_CTRL, 1); // enable voltage divider
-		
 		funPinMode(SENSOR_POWER_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
 		// funDigitalWrite(SENSOR_POWER_PIN, 0);
 		// Delay_Ms(1000);
@@ -136,20 +132,6 @@ void collect_readings() {
 		// 	Delay_Ms(1000);
 		// }
 
-		//# switch to supercap power if internal voltage is sufficient
-		// int vInternal_OK = vInternal_mV > 2500;
-		// funPinMode(POWER_CTRL_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		// funDigitalWrite(POWER_CTRL_PIN, vInternal_OK);
-		// sensor_cmd.value8 = vInternal_OK;
-		// Delay_Ms(1);
-
-		// int ldo_OK = solar_mV > 2500;
-		// //# switch back to battery if LDO voltage is low
-		// if (solar_mV < 2500) {
-		// 	funDigitalWrite(POWER_CTRL_PIN, 0);
-		// 	sensor_cmd.value8 = 0xDD;
-		// }
-		
 		u8 err = i2c_init(100);
 		#ifdef I2C_SCAN_ENABLED
 			printf("\nI2C init: %d\r\n", err);
@@ -182,7 +164,6 @@ void collect_readings() {
 		funPinMode(LED_PIN, GPIO_CFGLR_IN_PUPD);
 		funPinMode(I2C_SCL, GPIO_CFGLR_IN_PUPD);
 		funPinMode(I2C_SDA, GPIO_CFGLR_IN_PUPD);
-		funPinMode(PA4, GPIO_CFGLR_IN_PUPD);
 
 		//# prepare for sleep
 		ch5xx_setClock(CLK_SOURCE_PLL_60MHz);
@@ -195,9 +176,7 @@ void collect_readings() {
 		MESS_advertise(&sensor_cmd);
 
 		//# Disconnect SENSOR_MODE_PIN from GND to enter power_down mode.
-		if (funDigitalRead(SENSOR_MODE_PIN)) {
-			ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
-		}
+		ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
 	}
 
 #else
