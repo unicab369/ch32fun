@@ -21,14 +21,15 @@
 // #define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
-#define SLEEPTIME_MS 10000
-#define SOLAR_SWITCH_THRESHOLD_mV 2700
+#define SLEEPTIME_MS 4000
+#define SOLAR_SWITCH_THRESHOLD_mV 2600
 
-#define LED_PIN PA8
-
+#define LED_PIN					PA8
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
-#define SENSOR_POWER_PIN 		PA4			// HIGH = Turn on power to sensors
-#define POWER_CTRL_PIN 			PB22		// HIGH = switch to Solar power source
+
+#define SW_POWER 				PA4			// HIGH = switch to Solar power source
+#define SW_DIVIDER 				PA5			// HIGH = use external voltage divider
+#define SW_SENSORS 				PB22		// HIGH = Turn on power to sensors
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -54,22 +55,37 @@ u16 bus_mV, shunt_mV, current_mA, power_mW;
 
 void collect_readings() {
 	u16 temp, hum, lux;
+	int vInternal_mV, divider_mV;
 
-	//# get INA219 reading
-	ina219_read(INA219_ADDR, &bus_mV, &shunt_mV, &current_mA, &power_mW);
-	sensor_cmd.value4 = bus_mV;
-	sensor_cmd.value5 = current_mA;
+	//# get internal voltage reading
+	adc_set_channel(ADC_VBAT_CHANNEL);
+	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	vInternal_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	sensor_cmd.value4 = vInternal_mV;
 
-	//# get BH1750 reading
-	bh1750_read(BH1750_ADDR, &lux);
-	sensor_cmd.value3 = lux;
+	adc_set_channel(4);
+	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	divider_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	sensor_cmd.value5 = 200 + (divider_mV*1000)/333;
+	
+	//# turn OFF voltage divider
+	funDigitalWrite(SW_DIVIDER, 0);
+
+	// //# get INA219 reading
+	// ina219_read(INA219_ADDR, &bus_mV, &shunt_mV, &current_mA, &power_mW);
+	// sensor_cmd.value4 = bus_mV;
+	// sensor_cmd.value5 = current_mA;
 
 	//# get SHT3x reading
 	sht3x_read(SHT3X_ADDR, &temp, &hum);
 	sensor_cmd.value1 = temp;
 	sensor_cmd.value2 = hum;
 
-	#ifdef I2C_DEBUG_ENABLED
+	//# get BH1750 reading
+	bh1750_read(BH1750_ADDR, &lux);
+	sensor_cmd.value3 = lux;
+
+	#ifdef TEST_MODE_ENABLED
 		//# clear display
 		ssd1306_draw_fill(0x00);
 
@@ -77,19 +93,17 @@ void collect_readings() {
 		menu_render_text_at(0, str_output);
 		printf("\n\n%s", str_output);
 
-		sprintf(str_output, "B:%d, %dmA, %dmW", bus_mV, current_mA, power_mW);
-		menu_render_text_at(1, str_output);
-		printf("\n%s", str_output);
+		printf("\nInternal Voltage: %d mV", vInternal_mV);
+		printf("\nDivider Voltage: %d mV", divider_mV);
+		printf("\nSolar Voltage: %d mV", 200+(divider_mV*1000)/333);
+		printf("\nSensors readings:\n");
+
+		// sprintf(str_output, "B:%d, %dmA, %dmW", bus_mV, current_mA, power_mW);
+		// menu_render_text_at(1, str_output);
+		// printf("\n%s", str_output);
 
 		//# update display
 		ssd1306_draw_all();
-	#else
-		#ifdef TEST_MODE_ENABLED
-			printf("T:%dF, H:%d%%, Lux:%d, V:%d mV, I:%d mA, W:%d mW\n",
-				temp, hum, lux,
-				bus_mV, current_mA, power_mW
-			);
-		#endif
 	#endif
 }
 
@@ -98,70 +112,70 @@ void collect_readings() {
 		SystemInit();
 		funGpioInitAll();
 		ch5xx_allPinsPullUp();
+		DCDCEnable(); // Enable the internal DCDC
+		LSIEnable(); // Disable LSE, enable LSI
+
+		//# Voltage Divider Pin HIGH = use external voltage divider
+		funPinMode(SW_DIVIDER, GPIO_CFGLR_OUT_2Mhz_PP);
+		funDigitalWrite(SW_DIVIDER, 1);
 
 		//# Sensor Power Pin LOW = turn ON sensors (PFet)
-		funPinMode(SENSOR_POWER_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(SENSOR_POWER_PIN, 0);
+		funPinMode(SW_SENSORS, GPIO_CFGLR_OUT_2Mhz_PP);
+		funDigitalWrite(SW_SENSORS, 0);
 
-		// //# Power Control Pin LOW = default to battery power
-		funPinMode(POWER_CTRL_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		// funDigitalWrite(POWER_CTRL_PIN, 0);
-
-		//# Turn on the LED_PIN - for WeAct board PA8 is active LOW
-		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(LED_PIN, 0);
+		//# Power Control Pin LOW = default to battery power
+		funPinMode(SW_POWER, GPIO_CFGLR_OUT_2Mhz_PP);
+		// funDigitalWrite(SW_POWER, 0);
 
 		//# Sleep Mode Pin HIGH = enter shutdown mode
 		funPinMode(SLEEP_MODE_PIN, GPIO_CFGLR_IN_PUPD);
 		funDigitalWrite(SLEEP_MODE_PIN, 1);
 
-		//# SLEEP_MODE_PIN LOW on RESET = exit shutdown mode
-		while(!funDigitalRead(SLEEP_MODE_PIN)) {
-			funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
-			funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
-		}
-
-		//# get internal voltage reading
-		adc_set_channel(ADC_VBAT_CHANNEL);
-		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
-		int vInternal_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-		sensor_cmd.value6 = vInternal_mV;
-
 		//# setup I2C
 		u8 err = i2c_init(100);
 		#ifdef I2C_SCAN_ENABLED
-			printf("\nI2C init: %d\r\n", err);
+			printf("\nI2C init: %d", err);
 			i2c_scan(onHandle_pingFound);
 		#endif
 
 		//# get sensors readings
-		prepare_sensors();
-		// Delay_Us(100);		// wait for sensors to stabilize
+		sensor_cmd.value6 = prepare_sensors();
+		Delay_Ms(17);
+
+		//# Turn on the LED_PIN - for WeAct board PA8 is active LOW
+		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
+		funDigitalWrite(LED_PIN, 0);
 
 		#ifdef TEST_MODE_ENABLED
-			printf("\nInternal Voltage: %d mV\r\n", vInternal_mV);
 			ssd1306_init();
 
 			while(1) {
 				collect_readings();
-				Delay_Ms(1000);
+				//# advertise
+				RFCoreInit(LL_TX_POWER_0_DBM);
+				MESS_advertise(&sensor_cmd);
 			}
 		#else
 			collect_readings();
 		#endif
 
-		if (bus_mV > SOLAR_SWITCH_THRESHOLD_mV && vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV) {
-			// switch to solar power
-			funDigitalWrite(POWER_CTRL_PIN, 1);
-			// printf("*** Switched to Solar power source\r\n");
-		} else {
-			// switch to battery power
-			funDigitalWrite(POWER_CTRL_PIN, 0);
-			// printf("Battery power source\r\n");
+		//! SLEEP_MODE_PIN LOW on RESET = exit shutdown mode
+		while(!funDigitalRead(SLEEP_MODE_PIN)) {
+			funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
+			funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
 		}
 
+		// if (bus_mV > SOLAR_SWITCH_THRESHOLD_mV && vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV) {
+		// 	// printf("*** Switched to Solar power source\r\n");
+		// 	funDigitalWrite(SW_POWER, 1);		// switch to solar power
+			
+		// } else {
+		// 	// printf("Battery power source\r\n");
+		// 	funDigitalWrite(SW_POWER, 0);		// switch to battery power
+		// }
+
 		//# Turn off sensor power
-		funDigitalWrite(SENSOR_POWER_PIN, 1);
+		funDigitalWrite(SW_SENSORS, 1);
 
 		//# Turn off the LED_PIN
 		funDigitalWrite(LED_PIN, 1);
@@ -173,16 +187,14 @@ void collect_readings() {
 		funDigitalWrite(I2C_SDA, 0);
 
 		//# prepare for sleep
-		ch5xx_setClock(CLK_SOURCE_PLL_60MHz);
-		DCDCEnable(); // Enable the internal DCDC
-		LSIEnable(); // Disable LSE, enable LSI
+		ch5xx_setClock(CLK_SOURCE_PLL_80MHz);
 		ch5xx_sleep_rtc_init();
 
 		//# advertise
 		RFCoreInit(LL_TX_POWER_0_DBM);
 		MESS_advertise(&sensor_cmd);
 
-		//# sleep
+		//! Enter sleep
 		ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
 	}
 

@@ -215,21 +215,24 @@ void i2c_ina219_setup(u8 address, u8 bus_vRange, u8 pg_gain) {
 	#endif
 }
 
-void prepare_sensors() {
+u8 prepare_sensors() {
 	u8 ret;
+	u8 output = 0;
 
-	//# setup INA219
-	i2c_ina219_setup(INA219_ADDR, 0, 3);
-
+	// //# setup INA219
+	// i2c_ina219_setup(INA219_ADDR, 0, 3);
+	
 	//# setup SHT3x
 	// soft reset - this command will alwasy be busy, don't check for error
 	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x30, 0xA2}, 2);
-	Delay_Ms(1);
+	// Delay_Ms(1);
 
 	//# setup BH1750
 	// power on
 	ret = i2c_writeData(BH1750_ADDR, (u8[]){0x01}, 1);
 	if (ret != 0) {
+		output = output | 1;
+
 		#ifdef I2C_DEBUG_ENABLED 
 			printf("\nERROR: BH1750 powerON 0x%02X\r\n", ret);
 		#endif
@@ -237,6 +240,8 @@ void prepare_sensors() {
 		// set resolution
 		ret = i2c_writeData(BH1750_ADDR, (u8[]){0x23}, 1);
 		if (ret != 0) {
+			output = output | 2;
+
 			#ifdef I2C_DEBUG_ENABLED
 				printf("\nERROR: BH1750 resolution 0x%02X\r\n", ret);
 			#endif
@@ -246,8 +251,12 @@ void prepare_sensors() {
 	//# SHT3x config
 	ret = i2c_writeData(SHT3X_ADDR, (u8[]){0x21, 0x30}, 2);
 	if (ret != 0) {
+		output = output | 4;
+
 		#ifdef I2C_DEBUG_ENABLED
 			printf("\nERROR: SHT3x config 0x%02X\r\n", ret);
 		#endif
 	}
+
+	return output;
 }
