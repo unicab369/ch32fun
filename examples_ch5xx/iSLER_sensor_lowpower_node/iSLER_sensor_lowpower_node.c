@@ -18,7 +18,7 @@
 #include "../adc_basic/fun_adc_ch5xx.h"
 
 #define SHUTDOWN_MODE_ENABLED
-// #define TEST_MODE_ENABLED
+#define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 4000
@@ -56,20 +56,13 @@ u16 bus_mV, shunt_mV, current_mA, power_mW;
 void collect_readings() {
 	u16 temp, hum, lux;
 	int vInternal_mV, divider_mV;
+	u32 light_mV;
 
 	//# get internal voltage reading
 	adc_set_channel(ADC_VBAT_CHANNEL);
 	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 	vInternal_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 	sensor_cmd.value4 = vInternal_mV;
-
-	adc_set_channel(4);
-	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
-	divider_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-	sensor_cmd.value5 = 200 + (divider_mV*1000)/333;
-	
-	//# turn OFF voltage divider
-	funDigitalWrite(SW_DIVIDER, 0);
 
 	// //# get INA219 reading
 	// ina219_read(INA219_ADDR, &bus_mV, &shunt_mV, &current_mA, &power_mW);
@@ -85,17 +78,35 @@ void collect_readings() {
 	bh1750_read(BH1750_ADDR, &lux);
 	sensor_cmd.value3 = lux;
 
+	//# ADC PA14
+	adc_set_channel(4);
+	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	divider_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	sensor_cmd.value5 = 200 + (divider_mV*1000)/333;
+	//# turn OFF voltage divider
+	funDigitalWrite(SW_DIVIDER, 0);
+
+	//# ADC PA13
+	adc_set_channel(3);
+	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	light_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	sensor_cmd.value6 = light_mV;
+
+	//# Turn off sensor power
+	funDigitalWrite(SW_SENSORS, 1);
+
 	#ifdef TEST_MODE_ENABLED
 		//# clear display
-		ssd1306_draw_fill(0x00);
+		// ssd1306_draw_fill(0x00);
 
 		sprintf(str_output, "%dF, %d%%, lux:%d", temp, hum, lux);
-		menu_render_text_at(0, str_output);
+		// menu_render_text_at(0, str_output);
 		printf("\n\n%s", str_output);
 
 		printf("\nInternal Voltage: %d mV", vInternal_mV);
-		printf("\nDivider Voltage: %d mV", divider_mV);
-		printf("\nSolar Voltage: %d mV", 200+(divider_mV*1000)/333);
+		printf("\nSolar Voltage: %d ~%d mV", divider_mV, 200+(divider_mV*1000)/333);
+
+		printf("\nlight_mV: %d mV", light_mV);
 		printf("\nSensors readings:\n");
 
 		// sprintf(str_output, "B:%d, %dmA, %dmW", bus_mV, current_mA, power_mW);
@@ -103,7 +114,7 @@ void collect_readings() {
 		// printf("\n%s", str_output);
 
 		//# update display
-		ssd1306_draw_all();
+		// ssd1306_draw_all();
 	#endif
 }
 
@@ -130,6 +141,10 @@ void collect_readings() {
 		//# Sleep Mode Pin HIGH = enter shutdown mode
 		funPinMode(SLEEP_MODE_PIN, GPIO_CFGLR_IN_PUPD);
 		funDigitalWrite(SLEEP_MODE_PIN, 1);
+		
+		//# Turn on the LED_PIN - for WeAct board PA8 is active LOW
+		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
+		funDigitalWrite(LED_PIN, 0);
 
 		//# setup I2C
 		u8 err = i2c_init(100);
@@ -138,24 +153,26 @@ void collect_readings() {
 			i2c_scan(onHandle_pingFound);
 		#endif
 
-		//# get sensors readings
-		sensor_cmd.value6 = prepare_sensors();
-		Delay_Ms(17);
-
-		//# Turn on the LED_PIN - for WeAct board PA8 is active LOW
-		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(LED_PIN, 0);
-
 		#ifdef TEST_MODE_ENABLED
 			ssd1306_init();
 
 			while(1) {
+				funDigitalWrite(SW_DIVIDER, 1);
+				funDigitalWrite(SW_SENSORS, 0);
+				//# get sensors readings
+				Delay_Ms(1);
+				sensor_cmd.value7 = prepare_sensors();
+				Delay_Ms(5);
 				collect_readings();
+
 				//# advertise
 				RFCoreInit(LL_TX_POWER_0_DBM);
 				MESS_advertise(&sensor_cmd);
+				Delay_Ms(1000);
 			}
 		#else
+			sensor_cmd.value7 = prepare_sensors();
+			Delay_Ms(17);
 			collect_readings();
 		#endif
 
@@ -173,9 +190,6 @@ void collect_readings() {
 		// 	// printf("Battery power source\r\n");
 		// 	funDigitalWrite(SW_POWER, 0);		// switch to battery power
 		// }
-
-		//# Turn off sensor power
-		funDigitalWrite(SW_SENSORS, 1);
 
 		//# Turn off the LED_PIN
 		funDigitalWrite(LED_PIN, 1);
