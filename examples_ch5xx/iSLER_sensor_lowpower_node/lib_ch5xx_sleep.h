@@ -14,8 +14,8 @@ RV_STATIC_INLINE void ch5xx_sleep_powerDown(u32 cyc, u16 power_plan) {
 
 	SYS_SAFE_ACCESS (
 		R8_SLP_POWER_CTRL |= RB_RAM_RET_LV;
-		R16_POWER_PLAN = RB_PWR_PLAN_EN;
-		// R16_POWER_PLAN = RB_PWR_PLAN_EN | power_plan;
+		// R16_POWER_PLAN = RB_PWR_PLAN_EN;
+		R16_POWER_PLAN = RB_PWR_PLAN_EN | power_plan;
 	);
 
 	//# wfi

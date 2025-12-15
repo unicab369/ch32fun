@@ -21,7 +21,7 @@
 // #define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
-#define SLEEPTIME_MS 4000
+#define SLEEPTIME_MS 3000
 #define SOLAR_SWITCH_THRESHOLD_mV 2900
 
 #define LED_PIN					PA8
@@ -33,6 +33,8 @@
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
+
+int counter = 11;
 
 remote_command_t sensor_cmd = {
 	.command = 0xBB,
@@ -56,8 +58,15 @@ u16 bus_mV, shunt_mV, power_mW;
 void collect_readings() {
 	u16 temp, hum, lux;
 
+	funPinMode(I2C_SCL, GPIO_CFGLR_IN_PUPD);
+	funPinMode(I2C_SDA, GPIO_CFGLR_IN_PUPD);
+
 	//# Turn off the LED_PIN
 	funDigitalWrite(LED_PIN, 1);
+
+	Delay_Ms(5);
+	sensor_cmd.value8 = prepare_sensors();
+	Delay_Ms(20);
 
 	//# get internal voltage reading
 	adc_set_channel(ADC_VBAT_CHANNEL);
@@ -75,43 +84,50 @@ void collect_readings() {
 	bh1750_read(BH1750_ADDR, &lux);
 	sensor_cmd.value3 = lux;
 
-	//# ADC PA14
-	adc_set_channel(4);
-	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
-	int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-	solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-	solar_mV = 200+(solar_mV*1000)/333;
-	sensor_cmd.value5 = solar_mV;
+	funPinMode(I2C_SCL, GPIO_CFGLR_OUT_2Mhz_PP);
+	funPinMode(I2C_SDA, GPIO_CFGLR_OUT_2Mhz_PP);
+	funDigitalWrite(I2C_SCL, 0);
+	funDigitalWrite(I2C_SDA, 0);
+
+	sensor_cmd.value4 = counter++;
+
+	// //# ADC PA14
+	// adc_set_channel(4);
+	// adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	// int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	// solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
+	// solar_mV = 100 + (solar_mV*1000)/333;
+	// sensor_cmd.value5 = solar_mV;
 
 	//# turn OFF voltage divider
 	funDigitalWrite(SW_DIVIDER, 0);
 
-	//! WARNING: turn OFF SW_DIVIDER FIRST to avoid the solar voltage to go into the ADC
-	//# GND PA14 to reduce power consumption
-	funPinMode(PA14, GPIO_CFGLR_OUT_2Mhz_PP);
-	funDigitalWrite(PA14, 0);
+	// //! WARNING: turn OFF SW_DIVIDER FIRST to avoid the solar voltage to go into the ADC
+	// //# GND PA14 to reduce power consumption
+	// funPinMode(PA14, GPIO_CFGLR_OUT_2Mhz_PP);
+	// funDigitalWrite(PA14, 0);
 
-	//# ADC PA13
-	adc_set_channel(3);
-	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
-	int current_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-	current_mV = (current_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
+	// //# ADC PA13
+	// adc_set_channel(3);
+	// adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	// int current_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	// current_mV = (current_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
 
-	// current = ADC / (Gain * ShuntResistor); Gain = 50 for INA180A2; Shunt = 0.1 Ohm
-	int current_uA = current_mV*1000/5 - 2000; 		// 2000 offset
-	sensor_cmd.value6 = current_uA;
-	//# Pullup PA13 to reduce power consumption
-	// funPinMode(PA13, GPIO_CFGLR_OUT_50Mhz_PP);
-	// funDigitalWrite(PA13, 1);
+	// // current = ADC / (Gain * ShuntResistor); Gain = 50 for INA180A2; Shunt = 0.1 Ohm
+	// int current_uA = current_mV*1000/5 - 2000; 		// 2000 offset
+	// sensor_cmd.value6 = current_uA;
+	// //# Pullup PA13 to reduce power consumption
+	// // funPinMode(PA13, GPIO_CFGLR_OUT_50Mhz_PP);
+	// // funDigitalWrite(PA13, 1);
 
 	//# Turn off sensor power
 	funDigitalWrite(SW_SENSORS, 1);
 
-	//# turn ON solar panel if internal voltage and solar voltage are above threshold
-	int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
-	int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
-	funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
-	funDigitalWrite(SW_SOLAR, check1 && check2);
+	// //# turn ON solar panel if internal voltage and solar voltage are above threshold
+	// int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
+	// int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
+	// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
+	// funDigitalWrite(SW_SOLAR, check1 && check2);
 
 	#ifdef TEST_MODE_ENABLED
 		//# clear display
@@ -149,7 +165,8 @@ void collect_readings() {
 		funDigitalWrite(SW_SENSORS, 0);
 
 		//# Power Control Pin LOW = default to battery power
-		// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
+		// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
+		// funDigitalWrite(SW_SOLAR, 0);
 
 		//# Sleep Mode Pin HIGH = enter shutdown mode
 		funPinMode(SLEEP_MODE_PIN, GPIO_CFGLR_IN_PUPD);
@@ -159,16 +176,17 @@ void collect_readings() {
 		funPinMode(LED_PIN, GPIO_CFGLR_OUT_2Mhz_PP);
 		funDigitalWrite(LED_PIN, 0);
 
-		//# setup RF
-		// ch5xx_setClock(CLK_SOURCE_PLL_80MHz);
-		RFCoreInit(LL_TX_POWER_3_DBM);
-
 		//# setup I2C
 		u8 err = i2c_init(100);
 		#ifdef I2C_SCAN_ENABLED
 			printf("\nI2C init: %d", err);
 			i2c_scan(onHandle_pingFound);
 		#endif
+
+		while(!funDigitalRead(SLEEP_MODE_PIN)) {
+			funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
+			funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
+		}
 
 		#ifdef TEST_MODE_ENABLED
 			int toggle = 1;
@@ -182,10 +200,7 @@ void collect_readings() {
 				funDigitalWrite(LED_PIN, toggle);
 				toggle = !toggle;
 
-				//# get sensors readings  // 10ms
-				Delay_Ms(10);
-				sensor_cmd.value8 = prepare_sensors();
-				Delay_Ms(15);
+				//# get sensors readings
 				collect_readings();
 
 				//# advertise
@@ -193,31 +208,21 @@ void collect_readings() {
 				Delay_Ms(1000);
 			}
 		#else
-			Delay_Ms(1);
-			sensor_cmd.value8 = prepare_sensors();
-			Delay_Ms(17);
 			collect_readings();
+
+			//# setup RF
+			ch5xx_setClock(CLK_SOURCE_PLL_80MHz);
+			RFCoreInit(LL_TX_POWER_3_DBM);
+
+			//# advertise
+			MESS_advertise(&sensor_cmd);
+
+			//# prepare for sleep
+			ch5xx_sleep_rtc_init();
+
+			//! Enter sleep
+			ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
 		#endif
-
-		while(!funDigitalRead(SLEEP_MODE_PIN)) {
-            funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
-            funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
-        }
-
-		//# Set I2C to reduce power consumption
-		funPinMode(I2C_SCL, GPIO_CFGLR_OUT_2Mhz_PP);
-		funPinMode(I2C_SDA, GPIO_CFGLR_OUT_2Mhz_PP);
-		funDigitalWrite(I2C_SCL, 0);
-		funDigitalWrite(I2C_SDA, 0);
-
-		//# advertise
-		MESS_advertise(&sensor_cmd);
-
-		//# prepare for sleep
-		ch5xx_sleep_rtc_init();
-
-		//! Enter sleep
-		ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
 	}
 
 #else
