@@ -22,7 +22,7 @@
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 4000
-#define SOLAR_SWITCH_THRESHOLD_mV 2600
+#define SOLAR_SWITCH_THRESHOLD_mV 2900
 
 #define LED_PIN					PA8
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
@@ -110,8 +110,7 @@ void collect_readings() {
 	//# turn ON solar panel if internal voltage and solar voltage are above threshold
 	int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
 	int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
-	sensor_cmd.value1 = check1;
-	sensor_cmd.value2 = check2;
+	funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
 	funDigitalWrite(SW_SOLAR, check1 && check2);
 
 	#ifdef TEST_MODE_ENABLED
@@ -150,8 +149,7 @@ void collect_readings() {
 		funDigitalWrite(SW_SENSORS, 0);
 
 		//# Power Control Pin LOW = default to battery power
-		funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
-		// funDigitalWrite(SW_SOLAR, 0);
+		// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
 
 		//# Sleep Mode Pin HIGH = enter shutdown mode
 		funPinMode(SLEEP_MODE_PIN, GPIO_CFGLR_IN_PUPD);
@@ -195,9 +193,9 @@ void collect_readings() {
 				Delay_Ms(1000);
 			}
 		#else
-			Delay_Ms(5);
+			Delay_Ms(1);
 			sensor_cmd.value8 = prepare_sensors();
-			Delay_Ms(20);
+			Delay_Ms(17);
 			collect_readings();
 		#endif
 
