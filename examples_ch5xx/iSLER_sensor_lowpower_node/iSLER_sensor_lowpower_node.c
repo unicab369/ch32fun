@@ -16,6 +16,7 @@
 #include "lib_ch5xx_Mess.h"
 #include "i2c_devices.h"
 #include "../adc_basic/fun_adc_ch5xx.h"
+#include "register_debug_utilities.h"
 
 #define SHUTDOWN_MODE_ENABLED
 // #define TEST_MODE_ENABLED
@@ -35,8 +36,6 @@
 #define I2C_SDA PB12
 #define I2C_SCL PB13
 
-int counter = 11;
-
 remote_command_t sensor_cmd = {
 	.command = 0xBB,
 	.value1 = 0,
@@ -55,6 +54,7 @@ void onHandle_pingFound(int address) {
 
 char str_output[16] = {0};
 u16 bus_mV, shunt_mV, power_mW;
+int counter = 77;
 
 void collect_readings() {
 	u16 temp, hum, lux;
@@ -73,7 +73,7 @@ void collect_readings() {
 	int vInternal_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 	vInternal_mV = (vInternal_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
 	sensor_cmd.value4 = vInternal_mV;
-	// sensor_cmd.value4 = counter++;
+	sensor_cmd.value7 = counter++;
 
 	//# get SHT3x reading
 	sht3x_read(SHT3X_ADDR, &temp, &hum);
@@ -124,9 +124,9 @@ void collect_readings() {
 	//# turn ON solar panel if internal voltage and solar voltage are above threshold
 	int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
 	int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
+	sensor_cmd.value6 = check1*10 + check2;
 	funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
 	funDigitalWrite(SW_SOLAR, check1 && check2);
-	sensor_cmd.value6 = check1*10 + check2;
 
 	#ifdef TEST_MODE_ENABLED
 		//# clear display
@@ -139,7 +139,7 @@ void collect_readings() {
 		printf("\nInternal Voltage: %d mV", vInternal_mV);
 		printf("\nSolar Voltage: ~%d mV", solar_mV);
 
-		printf("\ncurrent: %d uA", current_uA);
+		// printf("\ncurrent: %d uA", current_uA);
 		printf("\nSensors readings:\n");
 
 		//# update display
@@ -151,20 +151,32 @@ void collect_readings() {
 	int main() {
 		SystemInit();
 		funGpioInitAll();
-		ch5xx_allPinsPullUp();
+		
+		funPinMode(PA0, GPIO_CFGLR_IN_PU);
+		funPinMode(PA1, GPIO_CFGLR_IN_PU);
+		funPinMode(PA2, GPIO_CFGLR_IN_PU);
+		funPinMode(PA3, GPIO_CFGLR_IN_PU);
+		funPinMode(PA4, GPIO_CFGLR_IN_PU);
+		funPinMode(PA5, GPIO_ModeIN_Floating);
+
+		funPinMode(PA6, GPIO_CFGLR_IN_PU);
+		funPinMode(PA7, GPIO_CFGLR_IN_PU);
+		funPinMode(PA8, GPIO_CFGLR_IN_PU);
+		funPinMode(PA9, GPIO_CFGLR_IN_PU);
+		funPinMode(PA10, GPIO_CFGLR_IN_PU);
+		funPinMode(PA11, GPIO_CFGLR_IN_PU);
+		funPinMode(PA12, GPIO_CFGLR_IN_PU);
+		funPinMode(PA13, GPIO_CFGLR_IN_PU);
+		funPinMode(PA14, GPIO_CFGLR_IN_PU);
+		funPinMode(PA15, GPIO_CFGLR_IN_PU);
+
+		//# PULLUP all PB pins
+		R32_PB_DIR = 0; //Direction input
+		R32_PB_PD_DRV = 0; //Disable pull-down
+		R32_PB_PU = P_All; //Enable pull-up
 
 		DCDCEnable(); // Enable the internal DCDC
 		LSIEnable(); // Disable LSE, enable LSI
-
-		// //# PULLUP PA pins
-		// R32_PA_DIR = 0; //Direction input
-		// R32_PA_PD_DRV = 0; //Disable pull-down
-		// R32_PA_PU = 0b1111111111011111; //Enable pull-up
-
-		// //# PULLUP all PB pins
-		// R32_PB_DIR = 0; //Direction input
-		// R32_PB_PD_DRV = 0; //Disable pull-down
-		// R32_PB_PU = P_All; //Enable pull-up
 
 		//# Voltage Divider Pin HIGH = use external voltage divider
 		funPinMode(SW_DIVIDER, GPIO_CFGLR_OUT_2Mhz_PP);
@@ -189,11 +201,6 @@ void collect_readings() {
 			i2c_scan(onHandle_pingFound);
 		#endif
 
-		while(!funDigitalRead(SLEEP_MODE_PIN)) {
-			funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
-			funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
-		}
-
 		#ifdef TEST_MODE_ENABLED
 			int toggle = 1;
 			ssd1306_init();
@@ -214,6 +221,11 @@ void collect_readings() {
 				Delay_Ms(1000);
 			}
 		#else
+			while(!funDigitalRead(SLEEP_MODE_PIN)) {
+				funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
+				funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
+			}
+
 			collect_readings();
 
 			//# setup RF
@@ -227,7 +239,7 @@ void collect_readings() {
 			ch5xx_sleep_rtc_init();
 
 			//! Enter sleep
-			ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAM2K) );
+			ch5xx_sleep_powerDown( MS_TO_RTC(SLEEPTIME_MS), (RB_PWR_RAMX) );
 		#endif
 	}
 

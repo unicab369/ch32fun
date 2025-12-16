@@ -102,7 +102,8 @@ int main() {
 			sprintf(str_output, "B:%d, %dmA", cmd_buffer.value4, cmd_buffer.value5);
 			menu_render_text_at(2, str_output);
 
-			sprintf(str_output, "B:%d, %dmA", cmd_buffer.value6, cmd_buffer.value7);
+			sprintf(str_output, "B:%d, %dmA, %d.",
+					cmd_buffer.value6, cmd_buffer.value7, cmd_buffer.value8);
 			menu_render_text_at(3, str_output);
 
 			sprintf(str_output, "%d /%d", received_counter, counter++);

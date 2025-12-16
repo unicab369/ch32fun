@@ -1,6 +1,5 @@
 #include "lib_i2c_ch5xx.h"
 #include "lib_ssd1306.h"
-#include "register_debug_utilities.h"
 
 // #define I2C_DEBUG_ENABLED
 #define R_SHUNT_mOHM 100
