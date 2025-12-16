@@ -8,5 +8,9 @@
 
 #define FUNCONF_DEBUG_HARDFAULT   0
 #define FUNCONF_USE_CLK_SEC       0
+#define FUNCONF_INIT_ANALOG       0 // ADC is not implemented yet
+#define FUNCONF_USE_DEBUGPRINTF   1
+#define FUNCONF_POWERED_BY_V5PIN  0
+
 
 #endif

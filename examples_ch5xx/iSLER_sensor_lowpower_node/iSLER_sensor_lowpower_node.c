@@ -18,7 +18,7 @@
 #include "../adc_basic/fun_adc_ch5xx.h"
 
 #define SHUTDOWN_MODE_ENABLED
-// #define TEST_MODE_ENABLED
+#define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 3000
@@ -139,7 +139,7 @@ void collect_readings() {
 		printf("\nInternal Voltage: %d mV", vInternal_mV);
 		printf("\nSolar Voltage: ~%d mV", solar_mV);
 
-		printf("\ncurrent: %d uA", current_uA);
+		// printf("\ncurrent: %d uA", current_uA);
 		printf("\nSensors readings:\n");
 
 		//# update display
@@ -189,31 +189,36 @@ void collect_readings() {
 			i2c_scan(onHandle_pingFound);
 		#endif
 
-		while(!funDigitalRead(SLEEP_MODE_PIN)) {
-			funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
-			funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
-		}
-
 		#ifdef TEST_MODE_ENABLED
 			int toggle = 1;
 			ssd1306_init();
 
 			for(;;) {
 				// if (funDigitalRead(SLEEP_MODE_PIN)) break;
-
 				funDigitalWrite(SW_DIVIDER, 1);
 				funDigitalWrite(SW_SENSORS, 0);
 				funDigitalWrite(LED_PIN, toggle);
 				toggle = !toggle;
 
-				//# get sensors readings
-				collect_readings();
+				RFCoreInit(LL_TX_POWER_3_DBM);
+				
+				for(int c = 0; c < sizeof(adv_channels); c++) {
+					Frame_TX(ACCESS_ADDRESS, adv, sizeof(adv), adv_channels[c], PHY_MODE);
+				}
 
-				//# advertise
-				MESS_advertise(&sensor_cmd);
+				// //# get sensors readings
+				// collect_readings();
+
+				// //# advertise
+				// MESS_advertise(&sensor_cmd);
 				Delay_Ms(1000);
 			}
 		#else
+			while(!funDigitalRead(SLEEP_MODE_PIN)) {
+				funDigitalWrite(LED_PIN, 0); Delay_Ms(100);
+				funDigitalWrite(LED_PIN, 1); Delay_Ms(100);
+			}
+
 			collect_readings();
 
 			//# setup RF

@@ -10,7 +10,7 @@
 #define I2C_SDA PB12
 #define I2C_SCL PB13
 
-uint8_t frame_info[] = { 0xff, 0x10 }; // PDU, len, (maybe not?) needed in RX mode
+#define ACCESS_ADDRESS 0x8E89BED6 // the "BED6" address for BLE advertisements
 
 void blink(int led_pin, int n) {
 	for(int i = n-1; i >= 0; i--) {
@@ -20,30 +20,6 @@ void blink(int led_pin, int n) {
 		if(i) Delay_Ms(33);
 	}
 }
-
-char str_output[16] = {0};
-remote_command_t cmd_buffer = {0};
-int received_counter = 0;
-
-void handle_receiving_frame(uint32_t time) {
-	// now listen for frames on channel 37. When the RF subsystem
-	// detects and finalizes one, "rx_ready" in iSLER.h is set true
-	Frame_RX(frame_info, 37, PHY_MODE);
-	while(!rx_ready);
-	
-	// we stepped over !rx_ready so we got a frame
-	remote_command_t *cmd = chMess_rx_handler();
-	if (!cmd) return;
-	cmd_buffer = *cmd;
-
-	blink(LED_PIN, 1);
-	printf("\n\nReceiv Command: %02X", cmd->command);
-	printf("\nValue1: %u", cmd->value1);
-	printf("\nValue2: %u", cmd->value2);
-	printf("\nValue3: %u", cmd->value3);
-	received_counter++;
-}
-
 
 void onHandle_pingFound(int address) {
 	printf("i2C found: 0x%02X\n", address);
@@ -83,8 +59,27 @@ int main() {
 	u32 time_ref = 0;
 	u32 counter = 0;
 
+	char str_output[16] = {0};
+	remote_command_t cmd_buffer = {0};
+	int received_counter = 0;
+
 	while (1) {
-		handle_receiving_frame(0);
+		// now listen for frames on channel 37. When the RF subsystem
+		// detects and finalizes one, "rx_ready" in iSLER.h is set true
+		Frame_RX(ACCESS_ADDRESS, 37, PHY_MODE);
+		while(!rx_ready);
+		
+		// we stepped over !rx_ready so we got a frame
+		remote_command_t *cmd = chMess_rx_handler();
+		if (!cmd) return;
+		cmd_buffer = *cmd;
+
+		blink(LED_PIN, 1);
+		printf("\n\nReceiv Command: %02X", cmd->command);
+		printf("\nValue1: %u", cmd->value1);
+		printf("\nValue2: %u", cmd->value2);
+		printf("\nValue3: %u", cmd->value3);
+		received_counter++;
 
 		if (TimeElapsed32(SysTick->CNT, time_ref) > DELAY_SEC_COUNT(1)) {
 			time_ref = SysTick->CNT;
