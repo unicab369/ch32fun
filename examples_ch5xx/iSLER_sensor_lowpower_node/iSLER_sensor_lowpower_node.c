@@ -151,7 +151,7 @@ void collect_readings() {
 	int main() {
 		SystemInit();
 		funGpioInitAll();
-		
+
 		funPinMode(PA0, GPIO_CFGLR_IN_PU);
 		funPinMode(PA1, GPIO_CFGLR_IN_PU);
 		funPinMode(PA2, GPIO_CFGLR_IN_PU);
