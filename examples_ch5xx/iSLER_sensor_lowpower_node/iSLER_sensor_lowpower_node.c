@@ -116,6 +116,10 @@ int max_value = 0;
 		funGpioInitAll();
 		ch5xx_allPinsPullUp(); // this reduces sleep from ~70uA to 1uA
 
+		//# Use battery by default
+		funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
+		funDigitalWrite(SW_SOLAR, 0);
+
 		//# Voltage Divider Pin HIGH = use external voltage divider
 		funPinMode(SW_DIVIDER, GPIO_CFGLR_OUT_2Mhz_PP);
 		funDigitalWrite(SW_DIVIDER, 1);
@@ -133,7 +137,7 @@ int max_value = 0;
 		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 		int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 		solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-		solar_mV = 400 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
+		solar_mV = 300 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
 		sensor_cmd.value5 = solar_mV;
 
 		//# turn OFF voltage divider
@@ -141,9 +145,8 @@ int max_value = 0;
 
 		//# turn ON solar panel if internal voltage and solar voltage are above threshold
 		int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
-		int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
+		int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV + 200;		// 200mV offset
 		sensor_cmd.value6 = check1*10 + check2;
-		funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
 		funDigitalWrite(SW_SOLAR, check1 && check2);
 
 		//# ADC PA13
@@ -157,7 +160,7 @@ int max_value = 0;
 		sensor_cmd.value6 = current_uA;
 		//# Pullup PA13 to reduce power consumption
 		funPinMode(PA13, GPIO_CFGLR_IN_PUPD);
-		
+
 
 		DCDCEnable(); // Enable the internal DCDC
 		LSIEnable(); // Disable LSE, enable LSI
