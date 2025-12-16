@@ -27,11 +27,10 @@
 #define LED_PIN					PA8
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
 
-#define SW_DIVIDER 				PA4			// HIGH = use external voltage divider
-#define ADC_SOLAR				PA5			// ADC Channel 1
-
 #define SW_SENSORS 				PB22		// HIGH = Turn on power to sensors
-#define SW_SOLAR 				PB10		// HIGH = switch to Solar power source
+#define SW_SOLAR 				PA5			// HIGH = switch to Solar power source
+#define SW_DIVIDER 				PA4			// HIGH = use external voltage divider
+#define ADC_SOLAR				PA14		// ADC Channel 4
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -62,12 +61,10 @@ void collect_readings() {
 
 	funPinMode(I2C_SCL, GPIO_CFGLR_IN_PUPD);
 	funPinMode(I2C_SDA, GPIO_CFGLR_IN_PUPD);
+	sensor_cmd.value8 = prepare_sensors();
 
 	//# Turn off the LED_PIN
 	funDigitalWrite(LED_PIN, 1);
-
-	Delay_Ms(5);
-	sensor_cmd.value8 = prepare_sensors();
 	Delay_Ms(20);
 
 	//# get internal voltage reading
@@ -93,11 +90,11 @@ void collect_readings() {
 	funDigitalWrite(I2C_SDA, 0);
 
 	//# ADC_SOLAR - Channel 1
-	adc_set_channel(1);
+	adc_set_channel(4);
 	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 	int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 	solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-	solar_mV = 100 + (solar_mV*1000)/333;
+	solar_mV = 400 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
 	sensor_cmd.value5 = solar_mV;
 
 	//# turn OFF voltage divider
@@ -124,11 +121,12 @@ void collect_readings() {
 	//# Turn off sensor power
 	funDigitalWrite(SW_SENSORS, 1);
 
-	// //# turn ON solar panel if internal voltage and solar voltage are above threshold
-	// int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
-	// int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
-	// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_10Mhz_PP);
-	// funDigitalWrite(SW_SOLAR, check1 && check2);
+	//# turn ON solar panel if internal voltage and solar voltage are above threshold
+	int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
+	int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
+	funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
+	funDigitalWrite(SW_SOLAR, check1 && check2);
+	sensor_cmd.value6 = check1*10 + check2;
 
 	#ifdef TEST_MODE_ENABLED
 		//# clear display
@@ -154,8 +152,19 @@ void collect_readings() {
 		SystemInit();
 		funGpioInitAll();
 		ch5xx_allPinsPullUp();
+
 		DCDCEnable(); // Enable the internal DCDC
 		LSIEnable(); // Disable LSE, enable LSI
+
+		// //# PULLUP PA pins
+		// R32_PA_DIR = 0; //Direction input
+		// R32_PA_PD_DRV = 0; //Disable pull-down
+		// R32_PA_PU = 0b1111111111011111; //Enable pull-up
+
+		// //# PULLUP all PB pins
+		// R32_PB_DIR = 0; //Direction input
+		// R32_PB_PD_DRV = 0; //Disable pull-down
+		// R32_PB_PU = P_All; //Enable pull-up
 
 		//# Voltage Divider Pin HIGH = use external voltage divider
 		funPinMode(SW_DIVIDER, GPIO_CFGLR_OUT_2Mhz_PP);
@@ -164,10 +173,6 @@ void collect_readings() {
 		//# Sensor Power Pin LOW = turn ON sensors (PFet)
 		funPinMode(SW_SENSORS, GPIO_CFGLR_OUT_2Mhz_PP);
 		funDigitalWrite(SW_SENSORS, 0);
-
-		//# Power Control Pin LOW = default to battery power
-		// funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
-		// funDigitalWrite(SW_SOLAR, 0);
 
 		//# Sleep Mode Pin HIGH = enter shutdown mode
 		funPinMode(SLEEP_MODE_PIN, GPIO_CFGLR_IN_PUPD);
