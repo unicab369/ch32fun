@@ -27,9 +27,11 @@
 #define LED_PIN					PA8
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
 
-#define SW_DIVIDER 				PA5			// HIGH = use external voltage divider
+#define SW_DIVIDER 				PA4			// HIGH = use external voltage divider
+#define ADC_SOLAR				PA5			// ADC Channel 1
+
 #define SW_SENSORS 				PB22		// HIGH = Turn on power to sensors
-#define SW_SOLAR 				PB10			// HIGH = switch to Solar power source
+#define SW_SOLAR 				PB10		// HIGH = switch to Solar power source
 
 #define I2C_SDA PB12
 #define I2C_SCL PB13
@@ -74,6 +76,7 @@ void collect_readings() {
 	int vInternal_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 	vInternal_mV = (vInternal_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
 	sensor_cmd.value4 = vInternal_mV;
+	// sensor_cmd.value4 = counter++;
 
 	//# get SHT3x reading
 	sht3x_read(SHT3X_ADDR, &temp, &hum);
@@ -89,23 +92,21 @@ void collect_readings() {
 	funDigitalWrite(I2C_SCL, 0);
 	funDigitalWrite(I2C_SDA, 0);
 
-	sensor_cmd.value4 = counter++;
-
-	// //# ADC PA14
-	// adc_set_channel(4);
-	// adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
-	// int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
-	// solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-	// solar_mV = 100 + (solar_mV*1000)/333;
-	// sensor_cmd.value5 = solar_mV;
+	//# ADC_SOLAR - Channel 1
+	adc_set_channel(1);
+	adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
+	int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
+	solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
+	solar_mV = 100 + (solar_mV*1000)/333;
+	sensor_cmd.value5 = solar_mV;
 
 	//# turn OFF voltage divider
 	funDigitalWrite(SW_DIVIDER, 0);
 
-	// //! WARNING: turn OFF SW_DIVIDER FIRST to avoid the solar voltage to go into the ADC
-	// //# GND PA14 to reduce power consumption
-	// funPinMode(PA14, GPIO_CFGLR_OUT_2Mhz_PP);
-	// funDigitalWrite(PA14, 0);
+	//! WARNING: turn OFF SW_DIVIDER FIRST to avoid the solar voltage to go into the ADC
+	//# GND ADC_SOLAR to reduce power consumption
+	funPinMode(ADC_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
+	funDigitalWrite(ADC_SOLAR, 0);
 
 	// //# ADC PA13
 	// adc_set_channel(3);
