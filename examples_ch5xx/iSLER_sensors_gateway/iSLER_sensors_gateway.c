@@ -63,49 +63,43 @@ int main() {
 	remote_command_t cmd_buffer = {0};
 	int received_counter = 0;
 
-	while (1) {
-		// now listen for frames on channel 37. When the RF subsystem
-		// detects and finalizes one, "rx_ready" in iSLER.h is set true
-		Frame_RX(ACCESS_ADDRESS, 37, PHY_MODE);
-		while(!rx_ready);
-		
+	while (1) {		
 		// we stepped over !rx_ready so we got a frame
 		remote_command_t *cmd = chMess_rx_handler();
-		if (!cmd) return;
-		cmd_buffer = *cmd;
+	// 	if (!cmd) return;
+	// 	cmd_buffer = *cmd;
 
-		blink(LED_PIN, 1);
-		printf("\n\nReceiv Command: %02X", cmd->command);
-		printf("\nValue1: %u", cmd->value1);
-		printf("\nValue2: %u", cmd->value2);
-		printf("\nValue3: %u", cmd->value3);
-		received_counter++;
+	// 	blink(LED_PIN, 1);
+	// 	printf("\n\nReceiv Command: %02X", cmd->command);
+	// 	printf("\nValue1: %u", cmd->value1);
+	// 	printf("\nValue2: %u", cmd->value2);
+	// 	printf("\nValue3: %u", cmd->value3);
+	// 	received_counter++;
 
-		if (TimeElapsed32(SysTick->CNT, time_ref) > DELAY_SEC_COUNT(1)) {
-			time_ref = SysTick->CNT;
+	// 	if (TimeElapsed32(SysTick->CNT, time_ref) > DELAY_SEC_COUNT(1)) {
+	// 		time_ref = SysTick->CNT;
 
-			//# clear display
-			ssd1306_draw_fill(0x00);
+	// 		//# clear display
+	// 		ssd1306_draw_fill(0x00);
 
-			sprintf(str_output, "Cmd: 0x%02X", cmd_buffer.command);
-			menu_render_text_at(0, str_output);
+	// 		sprintf(str_output, "Cmd: 0x%02X", cmd_buffer.command);
+	// 		menu_render_text_at(0, str_output);
 
-			sprintf(str_output, "%dF, %d%%, lux:%d", 
-					cmd_buffer.value1, cmd_buffer.value2, cmd_buffer.value3);
-			menu_render_text_at(1, str_output);
+	// 		sprintf(str_output, "%dF, %d%%, lux:%d", 
+	// 				cmd_buffer.value1, cmd_buffer.value2, cmd_buffer.value3);
+	// 		menu_render_text_at(1, str_output);
 
-			sprintf(str_output, "B:%d, %dmA", cmd_buffer.value4, cmd_buffer.value5);
-			menu_render_text_at(2, str_output);
+	// 		sprintf(str_output, "B:%d, %dmA", cmd_buffer.value4, cmd_buffer.value5);
+	// 		menu_render_text_at(2, str_output);
 
-			sprintf(str_output, "B:%d, %dmA", cmd_buffer.value6, cmd_buffer.value7);
-			menu_render_text_at(3, str_output);
+	// 		sprintf(str_output, "B:%d, %dmA", cmd_buffer.value6, cmd_buffer.value7);
+	// 		menu_render_text_at(3, str_output);
 
-			sprintf(str_output, "%d /%d", received_counter, counter++);
-			menu_render_text_at(4, str_output);
+	// 		sprintf(str_output, "%d /%d", received_counter, counter++);
+	// 		menu_render_text_at(4, str_output);
 
-			//# update display
-			ssd1306_draw_all();
-		}
+	// 		//# update display
+	// 		ssd1306_draw_all();
+	// 	}
 	}
-	
 }

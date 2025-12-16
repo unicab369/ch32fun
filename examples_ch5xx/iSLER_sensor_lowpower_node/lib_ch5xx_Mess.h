@@ -39,6 +39,7 @@ typedef struct PACKED {
 } MESS_DataFrame_t;
 
 typedef struct PACKED {
+	u8 LLHeader[2];
 	u8 mac[6];
 	u8 field_adv_flags[3];
 	u8 name_len;
@@ -72,6 +73,7 @@ __attribute__((aligned(4))) uint8_t adv[] = {
 		0x06, 0x09, 'R', 'X', ':', '?', '?'}; // 0x09: "Complete Local Name"
 		
 iSLER_frame_t frame = {
+	.LLHeader = {0x02, 0x0d},
 	.mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66},
 	.field_adv_flags = {0x02, 0x01, 0x06},
 	.name_len = 21,	 // name length is only 20 + local name byte
@@ -102,19 +104,32 @@ void MESS_advertise(remote_command_t *cmd) {
 }
 
 remote_command_t* chMess_rx_handler() {
+	// now listen for frames on channel 37. When the RF subsystem
+	// detects and finalizes one, "rx_ready" in iSLER.h is set true
+	Frame_RX(ACCESS_ADDRESS, 37, PHY_MODE);
+	while(!rx_ready);
+
 	// The chip stores the incoming frame in LLE_BUF, defined in extralibs/iSLER.h
 	u8 *frame = (u8*)LLE_BUF;
-	iSLER_frame_t* rx_frame = (iSLER_frame_t*)(frame + 2);
+	int rssi = ReadRSSI();
+
+	if (frame[0] == 2) {
+		// The first two bytes of the frame are metadata with PDU and length
+		printf("\nRSSI:%d PDU:%d len:%d MAC:", rssi, frame[0], frame[1]);
+		for(int i = 7; i > 2; i--) {
+			printf("%02x:", frame[i]);
+		}
+		printf("%02x data:", frame[2]);
+		for(int i = 8; i < frame[1] +2; i++) {
+			printf("%02x ", frame[i]);
+		}
+		printf("\n");
+	}
+
+	iSLER_frame_t* rx_frame = (iSLER_frame_t*)(frame);
 	u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
 
 	if (memcmp(rx_frame->mac, target_mac, 6) == 0) {
-		// first 8 bytes contains: [RSSI x 1Byte] [len x 1Byte] [MAC x 6Bytes]
-		// The first two bytes of the frame are metadata with RSSI and length
-		// printf("RSSI:%d len:%d MAC:", frame[0], frame[1]);
-		// PRINT_ARRAY(rx_frame->mac, "%02X");
-		// printf("Raw Data: ");
-		// PRINT_ARRAY_WITH_SIZE(frame, frame[1], "%02X");
-		
 		remote_command_t *cmd = (remote_command_t*)rx_frame->dataFrame.payload;
 		// printf("Command: %02X Value1: %08X Value2: %08X\n", 
 		// cmd->command, cmd->value1, cmd->value2);

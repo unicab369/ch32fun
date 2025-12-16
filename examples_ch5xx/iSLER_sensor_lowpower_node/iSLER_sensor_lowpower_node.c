@@ -18,10 +18,10 @@
 #include "../adc_basic/fun_adc_ch5xx.h"
 
 #define SHUTDOWN_MODE_ENABLED
-#define TEST_MODE_ENABLED
+// #define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
-#define SLEEPTIME_MS 3000
+#define SLEEPTIME_MS 2000
 #define SOLAR_SWITCH_THRESHOLD_mV 2900
 
 #define LED_PIN					PA8
