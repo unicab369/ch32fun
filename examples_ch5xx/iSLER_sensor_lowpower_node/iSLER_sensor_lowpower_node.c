@@ -33,6 +33,11 @@
 #define SW_DIVIDER 				PA4			// HIGH = use external voltage divider
 #define ADC_SOLAR				PA14		// ADC Channel 4
 
+#define CHARGER_THRESHOLD_mV 	3900
+#define SW_CHARGER				PA13
+
+#define ADC_CURRENT				PA12		// ADC Channel 2
+
 #define I2C_SDA PB12
 #define I2C_SCL PB13
 
@@ -114,7 +119,29 @@ int max_value = 0;
 	int main() {
 		SystemInit();
 		funGpioInitAll();
-		ch5xx_allPinsPullUp(); // this reduces sleep from ~70uA to 1uA
+		// ch5xx_allPinsPullUp(); // this reduces sleep from ~70uA to 1uA
+
+		funPinMode(PA0, GPIO_CFGLR_IN_PUPD);
+		funPinMode(PA1, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA2, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA3, GPIO_CFGLR_IN_PUPD); 
+		// funPinMode(PA4, GPIO_CFGLR_IN_PUPD); 
+		// funPinMode(PA5, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA6, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA7, GPIO_CFGLR_IN_PUPD); 
+		// funPinMode(PA8, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA9, GPIO_CFGLR_IN_PUPD); 
+		funPinMode(PA10, GPIO_CFGLR_IN_PUPD);
+		funPinMode(PA11, GPIO_CFGLR_IN_PUPD);
+		// funPinMode(PA12, GPIO_CFGLR_IN_PUPD);
+		// funPinMode(PA13, GPIO_CFGLR_IN_PUPD);
+		// funPinMode(PA14, GPIO_CFGLR_IN_PUPD);
+		// funPinMode(PA15, GPIO_CFGLR_IN_PUPD);
+
+		// All PB pins pull-up
+		R32_PB_DIR = 0; //Direction input
+		R32_PB_PD_DRV = 0; //Disable pull-down
+		R32_PB_PU = P_All; //Enable pull-up
 
 		//# Use battery by default
 		funPinMode(SW_SOLAR, GPIO_CFGLR_OUT_2Mhz_PP);
@@ -137,30 +164,34 @@ int max_value = 0;
 		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 		int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 		solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-		solar_mV = 300 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
+		solar_mV = 200 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
 		sensor_cmd.value5 = solar_mV;
 
 		//# turn OFF voltage divider
 		funDigitalWrite(SW_DIVIDER, 0);
 
-		//# turn ON solar panel if internal voltage and solar voltage are above threshold
+		//# power from Solar Panel if internal voltage and solar voltage are above threshold
 		int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
 		int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV + 200;		// 200mV offset
 		sensor_cmd.value6 = check1*10 + check2;
 		funDigitalWrite(SW_SOLAR, check1 && check2);
 
-		//# ADC PA13
-		adc_set_channel(3);
+		//# power Battery Charger if Solar Panel is above threshold
+		funPinMode(SW_CHARGER, GPIO_CFGLR_OUT_2Mhz_PP);
+		int check3 = solar_mV > CHARGER_THRESHOLD_mV;
+		funDigitalWrite(SW_CHARGER, check3);
+
+		//# ADC ADC_CURRENT
+		adc_set_channel(2);
 		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 		int current_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 		current_mV = (current_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
 
 		// current = ADC / (Gain * ShuntResistor); Gain = 50 for INA180A2; Shunt = 0.1 Ohm
 		int current_uA = current_mV*1000/5 - 2000; 		// 2000 offset
-		sensor_cmd.value6 = current_uA;
+		// sensor_cmd.value6 = current_uA;
 		//# Pullup PA13 to reduce power consumption
-		funPinMode(PA13, GPIO_CFGLR_IN_PUPD);
-
+		funPinMode(ADC_CURRENT, GPIO_CFGLR_IN_PUPD);
 
 		DCDCEnable(); // Enable the internal DCDC
 		LSIEnable(); // Disable LSE, enable LSI
