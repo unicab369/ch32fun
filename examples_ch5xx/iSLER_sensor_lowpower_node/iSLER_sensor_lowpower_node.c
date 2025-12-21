@@ -23,7 +23,9 @@
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 3000
-#define SOLAR_SWITCH_THRESHOLD_mV 2900
+#define INTERNAL_THRESHOLD_mV 2900
+#define SOLAR_SWITCH_THRESHOLD_mV 3100
+#define CHARGER_THRESHOLD_mV 	3900
 
 #define LED_PIN					PA8
 #define SLEEP_MODE_PIN 			PA15		// LOW = Exit shutdown mode
@@ -33,9 +35,7 @@
 #define SW_DIVIDER 				PA4			// HIGH = use external voltage divider
 #define ADC_SOLAR				PA14		// ADC Channel 4
 
-#define CHARGER_THRESHOLD_mV 	3900
 #define SW_CHARGER				PA13
-
 #define ADC_CURRENT				PA12		// ADC Channel 2
 
 #define I2C_SDA PB12
@@ -164,15 +164,15 @@ int max_value = 0;
 		adc_set_config(ADC_FREQ_DIV_10, ADC_PGA_GAIN_1_2, 0);
 		int solar_mV = adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2);
 		solar_mV = (solar_mV + adc_to_mV(adc_get_singleReading(), ADC_PGA_GAIN_1_2))/2;
-		solar_mV = 200 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333, 400mV offset
+		solar_mV = 200 + (solar_mV*1000)/333;		// R1 = 200kOmh, R2 = 100kOhm, V_Ratio = R2/(R1+R2) = .333
 		sensor_cmd.value5 = solar_mV;
 
 		//# turn OFF voltage divider
 		funDigitalWrite(SW_DIVIDER, 0);
 
 		//# power from Solar Panel if internal voltage and solar voltage are above threshold
-		int check1 = vInternal_mV > SOLAR_SWITCH_THRESHOLD_mV;
-		int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV + 200;		// 200mV offset
+		int check1 = vInternal_mV > INTERNAL_THRESHOLD_mV;
+		int check2 = solar_mV > SOLAR_SWITCH_THRESHOLD_mV;
 		sensor_cmd.value6 = check1*10 + check2;
 		funDigitalWrite(SW_SOLAR, check1 && check2);
 
