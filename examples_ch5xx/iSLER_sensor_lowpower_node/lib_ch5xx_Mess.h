@@ -26,13 +26,13 @@
 #endif
 
 typedef struct PACKED {
-	u16 preamble;		  // Sync pattern (0xAABB)
-	u16 control_bits;	  // control bits
-	u16 msgCode;		   // message integrity check
+	u16 preamble;		// Sync pattern
+	u16 control_bits;	// control bits
+	u16 msgCode;		// message integrity check
 	u8 dest[6];			// destination
 
 	u8 group_id;
-	u8 data_len;		  			 // length
+	u8 data_len;		  			// length
 	u8 payload[MAX_PAYLOAD_LEN];	// max payload length
 } MESS_DataFrame_t;
 
