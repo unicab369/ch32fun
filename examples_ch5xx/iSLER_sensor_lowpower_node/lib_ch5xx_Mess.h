@@ -89,30 +89,23 @@ iSLER_frame_t frame = {
 void MESS_advertise(remote_command_t *cmd) {
 	memcpy(&(frame.dataFrame.payload), cmd, sizeof(remote_command_t));
 	frame.LLHeader[1] = sizeof(iSLER_frame_t) - 2;
-
-	// printf("Frame: ");
-	// PRINT_STRUCT_BYTES(&frame, "%02X");
-	// printf("\n");
-
+	
 	for(int c = 0; c < sizeof(adv_channels); c++) {
 		Frame_TX(ACCESS_ADDRESS, (u8*)&frame, sizeof(frame), adv_channels[c], PHY_MODE);
 	}
-
-	// for(int c = 0; c < sizeof(adv_channels); c++) {
-	// 	Frame_TX(ACCESS_ADDRESS, adv, sizeof(adv), adv_channels[c], PHY_MODE);
-	// }
 }
 
-remote_command_t* chMess_rx_handler() {
+iSLER_frame_t* chMess_rx_handler() {
 	// now listen for frames on channel 37. When the RF subsystem
 	// detects and finalizes one, "rx_ready" in iSLER.h is set true
+	memset(LLE_BUF, 0, sizeof(LLE_BUF));
 	Frame_RX(ACCESS_ADDRESS, 37, PHY_MODE);
 	while(!rx_ready);
 
 	// The chip stores the incoming frame in LLE_BUF, defined in extralibs/iSLER.h
-	iSLER_frame_t* rx_frame = (iSLER_frame_t*)LLE_BUF;
-	u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x77 };
 	int rssi = ReadRSSI();
+	iSLER_frame_t* rx_frame = (iSLER_frame_t*)LLE_BUF;
+	return rx_frame;
 
     // if (frame[0] == 2) {
     //     // The first two bytes of the frame are metadata with PDU and length
@@ -127,10 +120,12 @@ remote_command_t* chMess_rx_handler() {
     //     printf("\n");
     // }
 
-	if (memcmp(rx_frame->mac, target_mac, 6) == 0) {
-		remote_command_t *cmd = (remote_command_t*)rx_frame->dataFrame.payload;
-		return cmd;
-	}
+	// u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x77 };
+	
+	// if (memcmp(rx_frame->mac, target_mac, 6) == 0) {
+	// 	remote_command_t *cmd = (remote_command_t*)rx_frame->dataFrame.payload;
+	// 	return cmd;
+	// }
 
-	return NULL;
+	// return NULL;
 }

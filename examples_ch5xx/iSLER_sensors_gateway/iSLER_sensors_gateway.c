@@ -22,20 +22,25 @@ void blink(int led_pin, int n) {
 }
 
 char str_output[16] = {0};
-remote_command_t cmd_buffer = {0};
 int received_counter = 0;
+remote_command_t cmd_buffer = {0};
 
-void handle_receiving_frame(uint32_t time) {	
-	// we stepped over !rx_ready so we got a frame
-	remote_command_t *cmd = chMess_rx_handler();
-	if (!cmd) return;
-	cmd_buffer = *cmd;
+void handle_receiving_frame() {
+	iSLER_frame_t* rx_frame = chMess_rx_handler();
+	if (!rx_frame) return;
+	if (rx_frame->dataFrame.preamble != 0xA1A2) return;
+	if (rx_frame->dataFrame.group_id != 0x55) return;
+
+	printf("\n\nmac: %02X:%02X:%02X:%02X:%02X:%02X",
+		rx_frame->mac[0], rx_frame->mac[1], rx_frame->mac[2],
+		rx_frame->mac[3], rx_frame->mac[4], rx_frame->mac[5]);
 
 	blink(LED_PIN, 1);
-	printf("\n\nReceiv Command: %02X", cmd->command);
-	printf("\nValue1: %u", cmd->value1);
-	printf("\nValue2: %u", cmd->value2);
-	printf("\nValue3: %u", cmd->value3);
+	memcpy(&cmd_buffer, rx_frame->dataFrame.payload, sizeof(remote_command_t));
+	printf("\nReceiv Command: %02X", cmd_buffer.command);
+	printf("\nValue1: %u", cmd_buffer.value1);
+	printf("\nValue2: %u", cmd_buffer.value2);
+	printf("\nValue3: %u", cmd_buffer.value3);
 	received_counter++;
 }
 
@@ -81,7 +86,7 @@ int main() {
 	u32 counter = 0;
 
 	while (1) {
-		handle_receiving_frame(0);
+		handle_receiving_frame();
 
 		if (TimeElapsed32(SysTick->CNT, time_ref) > DELAY_SEC_COUNT(1)) {
 			time_ref = SysTick->CNT;
