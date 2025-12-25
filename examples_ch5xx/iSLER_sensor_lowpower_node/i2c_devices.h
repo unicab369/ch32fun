@@ -1,4 +1,4 @@
-#include "lib_i2c_ch5xx.h"
+#include "../i2c_sensors/lib_i2c_ch5xx.h"
 #include "lib_ssd1306.h"
 
 // #define I2C_DEBUG_ENABLED

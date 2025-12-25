@@ -37,6 +37,7 @@ typedef struct PACKED {
 } MESS_DataFrame_t;
 
 typedef struct PACKED {
+	u8 LLHeader[2];
 	u8 mac[6];
 	u8 field_adv_flags[3];
 	u8 name_len;
@@ -64,61 +65,13 @@ typedef struct PACKED {
 u8 adv_channels[] = {37, 38, 39};
 // u8 adv_channels[] = {37};
 
-void Frame_TX2(u8 adv[], size_t len, u8 channel, u8 phy_mode) {
-	__attribute__((aligned(4))) u8  ADV_BUF[len+2]; // for the advertisement, which is 37 bytes + 2 header bytes
-
-	BB->CTRL_TX = (BB->CTRL_TX & 0xfffffffc) | 1;
-
-	DevSetChannel(channel);
-
-
-	// Uncomment to disable whitening to debug RF.
-	//BB->CTRL_CFG |= (1<<6);
-	DevSetMode(DEVSETMODE_TX);
-
-	BB->ACCESSADDRESS1 = 0x8E89BED6; // access address
-	BB->CRCINIT1 = 0x555555; // crc init
-
-	// LL->LL1 = (LL->LL1 & 0xfffffffe) | 1; // The "| 1" is for AUTO mode, to swap between RX <-> TX when either happened
-
-	ADV_BUF[0] = 0x02; // PDU 0x00, 0x02, 0x06 seem to work, with only 0x02 showing up on the phone
-	ADV_BUF[1] = len ;
-	memcpy(&ADV_BUF[2], adv, len);
-	LL->FRAME_BUF = (uint32_t)ADV_BUF;
-	
-	// Wait for tuning bit to clear.
-	for( int timeout = 3000; !(RF->RF26 & 0x1000000) && timeout >= 0; timeout-- );
-	
-	BB->CTRL_CFG = (phy_mode == PHY_2M) ? CTRL_CFG_PHY_2M:
-										  CTRL_CFG_PHY_1M; // default 1M for now
-
-
-	// This clears bit 17 (If set, seems to have no impact.)
-	LL->LL4 &= 0xfffdffff;
-
-	LL->TMR = (uint32_t)(len*100); // needs optimisation, per phy mode
-
-	BB->CTRL_CFG |= CTRL_CFG_START_TX;
-	BB->CTRL_TX &= 0xfffffffc;
-
-	LL->LL0 = 2; // Not sure what this does, but on RX it's 1
-
-	while(LL->TMR); // wait for tx buffer to empty
-	
-	DevSetMode(0);
-	if(LL->LL0 & 3) {
-		LL->CTRL_MOD &= CTRL_MOD_RFSTOP;
-		LL->LL0 |= 0x08;
-	}
-}
-
-
 iSLER_frame_t frame = {
-	.mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66},
+	.LLHeader = { 0x02, 0xff },
+	.mac = {0x11, 0x22, 0x33, 0x44, 0x55, 0x77},
 	.field_adv_flags = {0x02, 0x01, 0x06},
 	.name_len = 21,	 // name length is only 20 + local name byte
 	.ad_type_local_name = 0x09,
-	.name = { 'b','e', 'e', '-', '5', '5', '5' },
+	.name = { 'b','e', 'e', '-', '3', '3', '3' },
 	.data_len = sizeof(MESS_DataFrame_t) + 3,
 	.field_sev_data = {0xFF, 0xD7, 0x07},
 	.dataFrame = {
@@ -131,35 +84,51 @@ iSLER_frame_t frame = {
 	}
 };
 
+#define ACCESS_ADDRESS 0x8E89BED6 // the "BED6" address for BLE advertisements
+
 void MESS_advertise(remote_command_t *cmd) {
 	memcpy(&(frame.dataFrame.payload), cmd, sizeof(remote_command_t));
+	frame.LLHeader[1] = sizeof(iSLER_frame_t) - 2;
 
 	// printf("Frame: ");
 	// PRINT_STRUCT_BYTES(&frame, "%02X");
 	// printf("\n");
 
 	for(int c = 0; c < sizeof(adv_channels); c++) {
-		Frame_TX((u8*)&frame, sizeof(frame), adv_channels[c], PHY_MODE);
+		Frame_TX(ACCESS_ADDRESS, (u8*)&frame, sizeof(frame), adv_channels[c], PHY_MODE);
 	}
+
+	// for(int c = 0; c < sizeof(adv_channels); c++) {
+	// 	Frame_TX(ACCESS_ADDRESS, adv, sizeof(adv), adv_channels[c], PHY_MODE);
+	// }
 }
 
 remote_command_t* chMess_rx_handler() {
+	// now listen for frames on channel 37. When the RF subsystem
+	// detects and finalizes one, "rx_ready" in iSLER.h is set true
+	Frame_RX(ACCESS_ADDRESS, 37, PHY_MODE);
+	while(!rx_ready);
+
 	// The chip stores the incoming frame in LLE_BUF, defined in extralibs/iSLER.h
-	u8 *frame = (u8*)LLE_BUF;
-	iSLER_frame_t* rx_frame = (iSLER_frame_t*)(frame + 2);
-	u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 };
+	iSLER_frame_t* rx_frame = (iSLER_frame_t*)LLE_BUF;
+	u8 target_mac[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x77 };
+	int rssi = ReadRSSI();
+
+    // if (frame[0] == 2) {
+    //     // The first two bytes of the frame are metadata with PDU and length
+    //     printf("\nRSSI:%d PDU:%d len:%d MAC:", rssi, frame[0], frame[1]);
+    //     for(int i = 7; i > 2; i--) {
+    //         printf("%02x:", frame[i]);
+    //     }
+    //     printf("%02x data:", frame[2]);
+    //     for(int i = 8; i < frame[1] +2; i++) {
+    //         printf("%02x ", frame[i]);
+    //     }
+    //     printf("\n");
+    // }
 
 	if (memcmp(rx_frame->mac, target_mac, 6) == 0) {
-		// first 8 bytes contains: [RSSI x 1Byte] [len x 1Byte] [MAC x 6Bytes]
-		// The first two bytes of the frame are metadata with RSSI and length
-		// printf("RSSI:%d len:%d MAC:", frame[0], frame[1]);
-		// PRINT_ARRAY(rx_frame->mac, "%02X");
-		// printf("Raw Data: ");
-		// PRINT_ARRAY_WITH_SIZE(frame, frame[1], "%02X");
-		
 		remote_command_t *cmd = (remote_command_t*)rx_frame->dataFrame.payload;
-		// printf("Command: %02X Value1: %08X Value2: %08X\n", 
-		// cmd->command, cmd->value1, cmd->value2);
 		return cmd;
 	}
 

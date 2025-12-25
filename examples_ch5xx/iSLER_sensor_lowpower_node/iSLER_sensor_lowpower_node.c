@@ -19,7 +19,7 @@
 #include "register_debug_utilities.h"
 
 #define SHUTDOWN_MODE_ENABLED
-// #define TEST_MODE_ENABLED
+#define TEST_MODE_ENABLED
 // #define I2C_SCAN_ENABLED
 
 #define SLEEPTIME_MS 3000
@@ -74,12 +74,12 @@ void collect_readings() {
 
 	//# get SHT3x reading
 	sht3x_read(SHT3X_ADDR, &temp, &hum);
-	sensor_cmd.value1 = temp;
-	sensor_cmd.value2 = hum;
+	sensor_cmd.value1 = 77;
+	sensor_cmd.value2 = 88;
 
 	//# get BH1750 reading
 	bh1750_read(BH1750_ADDR, &lux);
-	sensor_cmd.value3 = lux;
+	sensor_cmd.value3 = 99;
 
 	funPinMode(I2C_SCL, GPIO_CFGLR_OUT_2Mhz_PP);
 	funPinMode(I2C_SDA, GPIO_CFGLR_OUT_2Mhz_PP);
@@ -101,12 +101,6 @@ void collect_readings() {
 		sprintf(str_output, "%dF, %d%%, lux:%d", temp, hum, lux);
 		// menu_render_text_at(0, str_output);
 		printf("\n\n%s", str_output);
-
-		printf("\nInternal Voltage: %d mV", vInternal_mV);
-		printf("\nSolar Voltage: ~%d mV", solar_mV);
-
-		// printf("\ncurrent: %d uA", current_uA);
-		printf("\nSensors readings:\n");
 
 		//# update display
 		// ssd1306_draw_all();
@@ -231,6 +225,7 @@ int max_value = 0;
 				collect_readings();
 
 				//# advertise
+				RFCoreInit(LL_TX_POWER_3_DBM);
 				MESS_advertise(&sensor_cmd);
 				Delay_Ms(1000);
 			}
